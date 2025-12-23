@@ -24,7 +24,7 @@ jobs:
         run: pip install yfinance pandas numpy requests
 
       - name: Run Max Pain Script
-        run: python scripts/calculate_pain.py
+        run: python calculate_pain.py
 
       - name: Commit and Push Changes
         run: |
