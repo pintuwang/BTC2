@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MSTR/BTC Max Pain Monitor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #1a1a1a; color: white; padding: 20px; }
+        .container { max-width: 900px; margin: auto; }
+        .advisor-box { background: #2d2d2d; border-left: 5px solid #00ff88; padding: 15px; margin-top: 20px; }
+        h2 { color: #00ff88; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>MSTR vs BTC Max Pain (8-Week Outlook)</h2>
+        <canvas id="maxPainChart"></canvas>
+        
+        <div id="advisor" class="advisor-box">
+            <h3>Risk Advisor</h3>
+            <p id="advice-text">Loading analysis...</p>
+        </div>
+    </div>
+
+    <script>
+        // Placeholder Data (You would populate this from your Python script)
+        const dates = ["Dec 26", "Jan 02", "Jan 09", "Jan 16", "Jan 23", "Jan 30", "Feb 06", "Feb 13"];
+        const mstrPain = [167.5, 175, 190, 150, 195, 195, 170, 165];
+        const btcPain = [94000, 96000, 92000, 89000, 95000, 94000, 92000, 90000];
+
+        const ctx = document.getElementById('maxPainChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: [{
+                    label: 'MSTR Max Pain ($)',
+                    data: mstrPain,
+                    borderColor: '#00ff88',
+                    yAxisID: 'y'
+                }, {
+                    label: 'BTC Max Pain ($)',
+                    data: btcPain,
+                    borderColor: '#5dade2',
+                    yAxisID: 'y1'
+                }]
+            },
+            options: {
+                scales: {
+                    y: { type: 'linear', position: 'left', title: { display: true, text: 'MSTR Price' } },
+                    y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'BTC Price' } }
+                }
+            }
+        });
+
+        // Advisor Logic
+        function generateAdvice() {
+            const jan16Idx = 3; // Index for Jan 16th
+            let advice = "<b>Current Strategy:</b> Your $150 strike is currently safe for the next 2 weeks. ";
+            
+            if (mstrPain[jan16Idx] <= 155) {
+                advice += "<br><br>⚠️ <b>DANGER ZONE:</b> On Jan 16, MSTR Max Pain drops to $150. BTC is also targeting $89k. This is a high-risk week to be short Puts. Consider closing your position by Jan 12.";
+            }
+            document.getElementById('advice-text').innerHTML = advice;
+        }
+        generateAdvice();
+    </script>
+</body>
+</html>
