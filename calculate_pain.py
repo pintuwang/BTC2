@@ -9,6 +9,49 @@ from datetime import datetime, timedelta
 MSTR_TICKER = "MSTR"
 NUM_WEEKS = 8
 
+import requests
+import pandas as pd
+import numpy as np
+import yfinance as yf
+import json
+from datetime import datetime, timedelta
+
+def get_deribit_btc_max_pain():
+    url = "https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option"
+    try:
+        response = requests.get(url).json()
+        if 'result' not in response: return {}
+        data = response['result']
+        df = pd.DataFrame(data)
+        
+        # Normalize Deribit's date format (e.g., '27DEC25') to '2025-12-27'
+        def format_date(name):
+            try:
+                raw_date = name.split('-')[1]
+                return datetime.strptime(raw_date, '%d%b%y').strftime('%Y-%m-%d')
+            except: return None
+
+        df['date'] = df['instrument_name'].apply(format_date)
+        df['strike'] = df['instrument_name'].apply(lambda x: int(x.split('-')[2]))
+        df['type'] = df['instrument_name'].apply(lambda x: x.split('-')[3])
+        
+        results = {}
+        for d, group in df.groupby('date'):
+            if not d: continue
+            strikes = sorted(group['strike'].unique())
+            pains = []
+            for s in strikes:
+                c_loss = group[(group['type'] == 'C') & (group['strike'] < s)].apply(lambda x: (s - x['strike']) * x['open_interest'], axis=1).sum()
+                p_loss = group[(group['type'] == 'P') & (group['strike'] > s)].apply(lambda x: (x['strike'] - s) * x['open_interest'], axis=1).sum()
+                pains.append(c_loss + p_loss)
+            results[d] = float(strikes[np.argmin(pains)])
+        return results
+    except Exception as e:
+        print(f"BTC Data Error: {e}")
+        return {}
+
+# [RE-RUN run_monitor() as provided in previous update]
+
 def get_next_fridays(n):
     fridays = []
     d = datetime.now()
