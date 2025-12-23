@@ -1,0 +1,35 @@
+name: Update Max Pain Monitor
+
+on:
+  schedule:
+    - cron: '0 0 * * 2' # Runs every Tuesday
+  workflow_dispatch: # Enables the manual "Run" button in GitHub Actions UI
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Allows the script to save data back to the repo
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/checkout@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: pip install yfinance pandas numpy requests
+
+      - name: Run Max Pain Script
+        run: python scripts/calculate_pain.py
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "Max Pain Bot"
+          git config --global user.email "bot@github.com"
+          git add data/history.json index.html
+          git commit -m "Manual/Weekly Update: $(date)" || echo "No changes to commit"
+          git push
