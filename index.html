@@ -44,8 +44,6 @@
                 if (!response.ok) throw new Error("JSON not found. Run your Python script first.");
                 
                 const payload = await response.json();
-                
-                // Update text indicators
                 updateEl.innerText = `Last Sync: ${payload.last_update} | MSTR Spot: $${payload.spot.toFixed(2)}`;
                 
                 const labels = payload.data.map(d => d.date);
@@ -68,40 +66,56 @@
                 data: {
                     labels: labels,
                     datasets: [
-    {
-        label: 'MSTR Max Pain',
-        data: mstrData,
-        yAxisID: 'yMSTR', // MUST match the ID in scales below
-        borderColor: '#00ff88',
-        spanGaps: true
-    },
-    {
-        label: 'BTC Max Pain',
-        data: btcData,
-        yAxisID: 'yBTC', // MUST match the ID in scales below
-        borderColor: '#3498db',
-        spanGaps: true
-    }
-],
-options: {
-    scales: {
-        yMSTR: { // ID for MSTR
-            type: 'linear',
-            position: 'left',
-            // This prevents the scale from forcing a 0-100 range
-            beginAtZero: false, 
-            title: { display: true, text: 'MSTR Price ($)' }
-        },
-        yBTC: { // ID for BTC
-            type: 'linear',
-            position: 'right',
-            beginAtZero: false,
-            grid: { display: false }, // Hides overlapping grid lines
-            title: { display: true, text: 'BTC Price ($)' }
+                        {
+                            label: 'MSTR Max Pain',
+                            data: mstrData,
+                            yAxisID: 'yMSTR',
+                            borderColor: '#00ff88',
+                            backgroundColor: 'rgba(0, 255, 136, 0.1)',
+                            fill: true,
+                            spanGaps: true
+                        },
+                        {
+                            label: 'BTC Max Pain',
+                            data: btcData,
+                            yAxisID: 'yBTC',
+                            borderColor: '#3498db',
+                            borderDash: [5, 5],
+                            spanGaps: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        yMSTR: {
+                            type: 'linear',
+                            position: 'left',
+                            beginAtZero: false, // This is the fix for the 0-100 issue
+                            title: { display: true, text: 'MSTR Price ($)', color: '#00ff88' },
+                            grid: { color: '#333' },
+                            ticks: { color: '#e0e0e0' }
+                        },
+                        yBTC: {
+                            type: 'linear',
+                            position: 'right',
+                            beginAtZero: false,
+                            grid: { display: false },
+                            title: { display: true, text: 'BTC Price ($)', color: '#3498db' },
+                            ticks: { color: '#e0e0e0' }
+                        },
+                        x: {
+                            ticks: { color: '#e0e0e0' },
+                            grid: { color: '#333' }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#e0e0e0' } }
+                    }
+                }
+            }); // Properly closed constructor
         }
-    }
-}
-                  
 
         function generateAdvice(data, spot) {
             const jan16 = data.find(d => d.date === "2026-01-16");
@@ -114,11 +128,7 @@ options: {
             }
 
             if (jan16 && jan16.mstr_pain) {
-                if (jan16.mstr_pain <= 155) {
-                    html += `<p class='warning'>⚠️ PIN RISK: Jan 16 Max Pain is $${jan16.mstr_pain}. High probability of a price "magnet" pulling MSTR toward your strike.</p>`;
-                } else {
-                    html += `<p>ℹ️ Jan 16 Max Pain is at $${jan16.mstr_pain}. This provides a safety buffer for your position.</p>`;
-                }
+                html += `<p>ℹ️ Jan 16 Max Pain magnet is at $${jan16.mstr_pain}.</p>`;
             }
             document.getElementById('advice-text').innerHTML = html;
         }
