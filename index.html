@@ -21,52 +21,90 @@
         </div>
     </div>
 
-    <script>
-        fetch('./data/history.json')
-          .then(response => response.json())
-          .then(payload => {
-              const dates = payload.data.map(d => d.date);
-              const mstrPain = payload.data.map(d => d.mstr_pain);
-              const btcPain = payload.data.map(d => d.btc_pain);
-      // ... update chart ...
-         });
+  <script>
+    async function loadData() {
+        const adviceEl = document.getElementById('advice-text');
+        try {
+            // 1. Fetch the JSON file
+            const response = await fetch('./data/history.json');
+            if (!response.ok) throw new Error("JSON not found. Run GitHub Action first.");
+            
+            const payload = await response.json();
+            
+            // 2. Update Header Info
+            document.getElementById('last-update').innerText = 
+                `Last Update: ${payload.last_update} | MSTR Spot: $${payload.spot.toFixed(2)}`;
+            
+            // 3. Extract the data safely for the chart
+            // We use 'payload.data' because that is how it's named in your JSON
+            const chartLabels = payload.data.map(d => d.date);
+            const mstrPains = payload.data.map(d => d.mstr_pain);
+            const btcPains = payload.data.map(d => d.btc_pain);
 
+            renderChart(chartLabels, mstrPains, btcPains);
+            generateAdvice(payload.data, payload.spot);
+            
+        } catch (err) {
+            adviceEl.innerHTML = `<span class='warning'>Error: ${err.message}</span>`;
+            console.error(err);
+        }
+    }
+
+    function renderChart(labels, mstrData, btcData) {
         const ctx = document.getElementById('maxPainChart').getContext('2d');
         new Chart(ctx, {
             type: 'line',
             data: {
-                labels: dates,
+                labels: labels, // Fixed the 'dates' vs 'labels' reference
                 datasets: [{
-                    label: 'MSTR Max Pain ($)',
-                    data: mstrPain,
+                    label: 'MSTR Max Pain',
+                    data: mstrData,
                     borderColor: '#00ff88',
+                    tension: 0.3,
                     yAxisID: 'y'
                 }, {
-                    label: 'BTC Max Pain ($)',
-                    data: btcPain,
+                    label: 'BTC Max Pain',
+                    data: btcData,
                     borderColor: '#5dade2',
+                    borderDash: [5, 5],
+                    tension: 0.3,
                     yAxisID: 'y1'
                 }]
             },
             options: {
+                responsive: true,
                 scales: {
-                    y: { type: 'linear', position: 'left', title: { display: true, text: 'MSTR Price' } },
-                    y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'BTC Price' } }
+                    y: { title: { display: true, text: 'MSTR Price ($)' }, grid: { color: '#333' } },
+                    y1: { position: 'right', title: { display: true, text: 'BTC Price ($)' }, grid: { display: false } }
                 }
             }
         });
+    }
 
-        // Advisor Logic
-        function generateAdvice() {
-            const jan16Idx = 3; // Index for Jan 16th
-            let advice = "<b>Current Strategy:</b> Your $150 strike is currently safe for the next 2 weeks. ";
-            
-            if (mstrPain[jan16Idx] <= 155) {
-                advice += "<br><br>⚠️ <b>DANGER ZONE:</b> On Jan 16, MSTR Max Pain drops to $150. BTC is also targeting $89k. This is a high-risk week to be short Puts. Consider closing your position by Jan 12.";
-            }
-            document.getElementById('advice-text').innerHTML = advice;
+    function generateAdvice(data, spot) {
+        const jan16 = data.find(d => d.date === "2026-01-16");
+        let html = "";
+
+        // Check against your $150 Put Strike
+        if (spot > 150) {
+            html += "<p class='safe'>✅ MSTR ($" + spot.toFixed(2) + ") is currently above your $150 strike.</p>";
+        } else {
+            html += "<p class='warning'>⚠️ ALERT: MSTR is below your $150 strike!</p>";
         }
-        generateAdvice();
-    </script>
+
+        // Jan 16 Gravity Check (Real market data shows this is a major 'Pin' date)
+        if (jan16 && jan16.mstr_pain) {
+            if (jan16.mstr_pain <= 155) {
+                html += `<p class='warning'>⚠️ PIN RISK: Jan 16 Max Pain is $${jan16.mstr_pain}. Market makers may pull the price toward your $150 strike.</p>`;
+            } else {
+                html += `<p>ℹ️ Jan 16 Max Pain is $${jan16.mstr_pain}, providing a buffer for your puts.</p>`;
+            }
+        }
+
+        document.getElementById('advice-text').innerHTML = html;
+    }
+
+    loadData();
+</script>
 </body>
 </html>
