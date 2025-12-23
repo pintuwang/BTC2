@@ -68,59 +68,40 @@
                 data: {
                     labels: labels,
                     datasets: [
-                        {
-                            label: 'MSTR Max Pain',
-                            data: mstrData,
-                            borderColor: '#00ff88',
-                            backgroundColor: 'rgba(0, 255, 136, 0.1)',
-                            yAxisID: 'yMSTR', // Maps to left axis
-                            tension: 0.3,
-                            fill: true,
-                            spanGaps: true // Connects lines across missing data points
-                        },
-                        {
-                            label: 'BTC Max Pain',
-                            data: btcData,
-                            borderColor: '#3498db',
-                            borderDash: [5, 5],
-                            yAxisID: 'yBTC', // Maps to right axis
-                            tension: 0.3,
-                            spanGaps: true
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        yMSTR: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            title: { display: true, text: 'MSTR Price ($)', color: '#00ff88' },
-                            grid: { color: '#333' },
-                            ticks: { color: '#e0e0e0' }
-                        },
-                        yBTC: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            title: { display: true, text: 'BTC Price ($)', color: '#3498db' },
-                            // BTC scale is independent (0 to ~110k)
-                            grid: { display: false }, 
-                            ticks: { color: '#e0e0e0' }
-                        },
-                        x: {
-                            ticks: { color: '#e0e0e0' },
-                            grid: { color: '#333' }
-                        }
-                    },
-                    plugins: {
-                        legend: { labels: { color: '#e0e0e0', font: { size: 14 } } }
-                    }
-                }
-            });
+    {
+        label: 'MSTR Max Pain',
+        data: mstrData,
+        yAxisID: 'yMSTR', // MUST match the ID in scales below
+        borderColor: '#00ff88',
+        spanGaps: true
+    },
+    {
+        label: 'BTC Max Pain',
+        data: btcData,
+        yAxisID: 'yBTC', // MUST match the ID in scales below
+        borderColor: '#3498db',
+        spanGaps: true
+    }
+],
+options: {
+    scales: {
+        yMSTR: { // ID for MSTR
+            type: 'linear',
+            position: 'left',
+            // This prevents the scale from forcing a 0-100 range
+            beginAtZero: false, 
+            title: { display: true, text: 'MSTR Price ($)' }
+        },
+        yBTC: { // ID for BTC
+            type: 'linear',
+            position: 'right',
+            beginAtZero: false,
+            grid: { display: false }, // Hides overlapping grid lines
+            title: { display: true, text: 'BTC Price ($)' }
         }
+    }
+}
+                  
 
         function generateAdvice(data, spot) {
             const jan16 = data.find(d => d.date === "2026-01-16");
