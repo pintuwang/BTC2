@@ -1,34 +1,36 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>MSTR/BTC Max Pain Monitor</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: sans-serif; background: #1a1a1a; color: white; padding: 20px; }
-        .container { max-width: 900px; margin: auto; }
-        .advisor-box { background: #2d2d2d; border-left: 5px solid #00ff88; padding: 15px; margin-top: 20px; }
-        .status { font-size: 0.85em; color: #888; margin-bottom: 10px; }
-        h2 { color: #00ff88; }
+        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #e0e0e0; padding: 20px; }
+        .container { max-width: 1000px; margin: auto; background: #1e1e1e; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+        .advisor-box { background: #252525; border-left: 5px solid #00ff88; padding: 20px; margin-top: 30px; border-radius: 4px; }
+        .status { font-size: 0.9em; color: #888; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        h2 { color: #00ff88; margin-top: 0; }
         .warning { color: #ff4444; font-weight: bold; }
         .safe { color: #00ff88; font-weight: bold; }
+        canvas { background: #1a1a1a; border-radius: 8px; padding: 10px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>MSTR vs BTC Max Pain (8-Week Outlook)</h2>
+        <h2>MSTR & BTC Max Pain Monitor</h2>
+        <div id="last-update" class="status">Connecting to data source...</div>
         
-        <div id="last-update" class="status">Waiting for data...</div>
-        
-        <canvas id="maxPainChart"></canvas>
+        <div style="position: relative; height:400px; width:100%">
+            <canvas id="maxPainChart"></canvas>
+        </div>
         
         <div id="advisor" class="advisor-box">
             <h3>Risk Advisor</h3>
-            <p id="advice-text">Loading analysis...</p>
+            <p id="advice-text">Analyzing market magnets...</p>
         </div>
     </div>
 
     <script>
-        // We use DOMContentLoaded to ensure the page is ready before the script runs
         document.addEventListener('DOMContentLoaded', () => {
             loadData();
         });
@@ -39,23 +41,21 @@
 
             try {
                 const response = await fetch('./data/history.json');
-                if (!response.ok) throw new Error("JSON not found. Run GitHub Action first.");
+                if (!response.ok) throw new Error("JSON file not found. Ensure GitHub Action has run.");
                 
                 const payload = await response.json();
                 
-                // Update the status line
-                updateEl.innerText = `Last Update: ${payload.last_update} | MSTR Spot: $${payload.spot.toFixed(2)}`;
+                updateEl.innerText = `Last Sync: ${payload.last_update} | MSTR Spot: $${payload.spot.toFixed(2)}`;
                 
-                const chartLabels = payload.data.map(d => d.date);
-                const mstrPains = payload.data.map(d => d.mstr_pain);
-                const btcPains = payload.data.map(d => d.btc_pain);
+                const labels = payload.data.map(d => d.date);
+                const mstrData = payload.data.map(d => d.mstr_pain);
+                const btcData = payload.data.map(d => d.btc_pain);
 
-                renderChart(chartLabels, mstrPains, btcPains);
+                renderChart(labels, mstrData, btcData);
                 generateAdvice(payload.data, payload.spot);
                 
             } catch (err) {
                 adviceEl.innerHTML = `<span class='warning'>Error: ${err.message}</span>`;
-                console.error(err);
             }
         }
 
@@ -69,22 +69,43 @@
                         label: 'MSTR Max Pain',
                         data: mstrData,
                         borderColor: '#00ff88',
+                        backgroundColor: '#00ff8833',
                         tension: 0.3,
-                        yAxisID: 'y'
+                        yAxisID: 'y',
+                        spanGaps: true // Connects the lines if data points are missing
                     }, {
                         label: 'BTC Max Pain',
                         data: btcData,
                         borderColor: '#5dade2',
                         borderDash: [5, 5],
                         tension: 0.3,
-                        yAxisID: 'y1'
+                        yAxisID: 'y1',
+                        spanGaps: true
                     }]
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     scales: {
-                        y: { title: { display: true, text: 'MSTR Price ($)' }, grid: { color: '#333' } },
-                        y1: { position: 'right', title: { display: true, text: 'BTC Price ($)' }, grid: { display: false } }
+                        y: { 
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: { display: true, text: 'MSTR Price ($)', color: '#00ff88' },
+                            grid: { color: '#333' },
+                            ticks: { color: '#e0e0e0' }
+                        },
+                        y1: { 
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: { display: true, text: 'BTC Price ($)', color: '#5dade2' },
+                            grid: { display: false }, // Only show one set of grid lines
+                            ticks: { color: '#e0e0e0' }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#e0e0e0' } }
                     }
                 }
             });
@@ -94,20 +115,22 @@
             const jan16 = data.find(d => d.date === "2026-01-16");
             let html = "";
 
+            // Strategy Check
             if (spot > 150) {
                 html += `<p class='safe'>✅ MSTR ($${spot.toFixed(2)}) is currently above your $150 strike.</p>`;
             } else {
                 html += "<p class='warning'>⚠️ ALERT: MSTR is below your $150 strike!</p>";
             }
 
+            // Magnet Check
             if (jan16 && jan16.mstr_pain) {
-                // Check if Max Pain is dangerously low
                 if (jan16.mstr_pain <= 155) {
-                    html += `<p class='warning'>⚠️ PIN RISK: Jan 16 Max Pain is $${jan16.mstr_pain}. Market makers may pull the price toward your $150 strike.</p>`;
+                    html += `<p class='warning'>⚠️ PIN RISK: Jan 16 Max Pain is $${jan16.mstr_pain}. This "magnet" is very close to your strike. High risk of price being pulled down.</p>`;
                 } else {
-                    html += `<p>ℹ️ Jan 16 Max Pain is $${jan16.mstr_pain}, providing a buffer for your puts.</p>`;
+                    html += `<p>ℹ️ Jan 16 Max Pain magnet is at $${jan16.mstr_pain}, providing a buffer for your puts.</p>`;
                 }
             }
+
             document.getElementById('advice-text').innerHTML = html;
         }
     </script>
