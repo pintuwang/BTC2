@@ -1,46 +1,16 @@
 {
-    "last_update": "2025-12-23 16:37",
-    "spot": 159.10000610351562,
+    "last_update": "2025-12-24 07:23",
+    "spot": 165.5,
     "data": [
         {
             "date": "2025-12-26",
-            "mstr_pain": 165.0,
-            "btc_pain": 96000.0
-        },
-        {
-            "date": "2026-01-02",
-            "mstr_pain": 175.0,
-            "btc_pain": 88000.0
-        },
-        {
-            "date": "2026-01-09",
-            "mstr_pain": 185.0,
-            "btc_pain": 88000.0
+            "mstr_pain": 170,
+            "btc_pain": 95000
         },
         {
             "date": "2026-01-16",
-            "mstr_pain": 170.0,
-            "btc_pain": null
-        },
-        {
-            "date": "2026-01-23",
-            "mstr_pain": 190.0,
-            "btc_pain": null
-        },
-        {
-            "date": "2026-01-30",
-            "mstr_pain": 190.0,
-            "btc_pain": 90000.0
-        },
-        {
-            "date": "2026-02-06",
-            "mstr_pain": null,
-            "btc_pain": null
-        },
-        {
-            "date": "2026-02-13",
-            "mstr_pain": null,
-            "btc_pain": null
+            "mstr_pain": 180,
+            "btc_pain": 105000
         }
     ]
 }
