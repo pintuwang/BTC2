@@ -2,61 +2,135 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MSTR/BTC Strategic Dashboard</title>
+    <title>MSTR/BTC Strategic Monitor</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; padding: 20px; }
-        .container { max-width: 1100px; margin: auto; background: #111; padding: 25px; border-radius: 15px; border: 1px solid #333; }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 15px; }
-        .chart-box { height: 500px; margin-top: 25px; }
-        .legend-tag { color: #ff4444; font-size: 0.85em; font-weight: bold; margin-top: 5px; }
-        #sgt-clock { color: #888; font-size: 0.9em; }
+        .container { max-width: 1200px; margin: auto; background: #111; padding: 25px; border-radius: 15px; border: 1px solid #333; }
+        
+        /* Neon Alert */
+        @keyframes pulse-red { 0% { box-shadow: 0 0 5px #ff0000; } 100% { box-shadow: 0 0 25px #ff0000; } }
+        .emergency { animation: pulse-red 0.5s infinite alternate; border: 2px solid #ff0000 !important; }
+
+        .score-card { text-align: center; padding: 30px; border-radius: 12px; background: #1a1a1a; border: 1px solid #333; margin-bottom: 20px; transition: 0.3s; }
+        .phase-badge { display: inline-block; padding: 5px 15px; border-radius: 20px; font-size: 0.8em; font-weight: bold; background: #333; margin-top: 10px; }
+        
+        .controls { display: flex; justify-content: space-between; align-items: center; background: #222; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+        input { background: #000; color: #00ff88; border: 1px solid #444; padding: 8px; border-radius: 5px; width: 100px; font-weight: bold; font-size: 1.1em; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #151515; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #222; }
+        th { background: #222; color: #888; font-size: 0.8em; text-transform: uppercase; }
+        
+        .legend-item { color: #ff4444; font-weight: bold; font-size: 0.85em; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <div>
-                <h2 style="margin:0;">Institutional Magnet Monitor</h2>
-                <div class="legend-tag">▲ RED TRIANGLE = 3rd Friday Monthly Expiry</div>
-            </div>
-            <div id="sgt-clock">SGT: --</div>
+        <div class="score-card" id="alertBox">
+            <h1 id="scoreDisplay" style="font-size: 4em; margin: 0;">--</h1>
+            <div id="phaseDisplay" class="phase-badge">Detecting Phase...</div>
+            <p id="safetyMsg" style="margin-top: 15px; font-weight: bold; letter-spacing: 1px;"></p>
         </div>
-        <div class="chart-box"><canvas id="mainChart"></canvas></div>
+
+        <div class="controls">
+            <div>
+                <label style="color:#888;">TARGET STRIKE: </label>
+                <input type="number" id="strikeInput" value="150" oninput="updateUI()">
+            </div>
+            <div style="text-align: right;">
+                <div id="sgtClock" style="font-weight: 500;">SGT: --</div>
+                <div class="legend-item">◆ RED DIAMOND = Monthly Expiry</div>
+            </div>
+        </div>
+
+        <div style="height: 450px;">
+            <canvas id="mainChart"></canvas>
+        </div>
+
+        <h3 style="margin-top:40px; color: #888;">Historical Log (30 Days)</h3>
+        <table>
+            <thead><tr><th>Date</th><th>MSTR Spot</th><th>Weekly Pain</th><th>Phase</th></tr></thead>
+            <tbody id="logTable"></tbody>
+        </table>
     </div>
 
 <script>
+    let marketData = null;
+    let chartObj = null;
+
     async function init() {
         const res = await fetch('./data/history.json');
-        const market = await res.json();
+        marketData = await res.json();
         
-        // Convert to Singapore Time
-        const dateObj = new Date(market.last_update_utc);
-        document.getElementById('sgt-clock').innerText = `Updated (SGT): ${dateObj.toLocaleString('en-SG', {timeZone:'Asia/Singapore'})}`;
+        // SGT Time conversion
+        const utc = new Date(marketData.last_update_utc);
+        document.getElementById('sgtClock').innerText = `SGT: ${utc.toLocaleString('en-SG', {timeZone:'Asia/Singapore', dateStyle:'medium', timeStyle:'short'})}`;
+        
+        updateUI();
+        loadTable();
+    }
 
+    function updateUI() {
+        const strike = parseFloat(document.getElementById('strikeInput').value);
+        const spot = marketData.spot;
+        const pain = marketData.data[0].mstr_pain;
+        const phase = marketData.phase;
+
+        // Safety Score Logic
+        let score = 0;
+        if (spot > strike * 1.15) score += 4;
+        else if (spot > strike) score += 2;
+        if (pain > strike) score += 6;
+
+        document.getElementById('scoreDisplay').innerText = `${score}/10`;
+        document.getElementById('phaseDisplay').innerText = phase;
+        
+        const alertBox = document.getElementById('alertBox');
+        const msg = document.getElementById('safetyMsg');
+
+        // Reset Styles
+        alertBox.className = "score-card";
+        
+        if (spot <= strike * 1.05) {
+            alertBox.classList.add('emergency');
+            msg.innerText = "🔴 DANGER: PRICE NEAR STRIKE";
+            msg.style.color = "#ff4444";
+        } else if (score >= 8) {
+            msg.innerText = "🟢 SAFE: INSTITUTIONAL FLOOR DETECTED";
+            msg.style.color = "#00ff88";
+            alertBox.style.borderColor = "#00ff88";
+        } else {
+            msg.innerText = "🟡 CAUTION: MONITOR MAGNET TREND";
+            msg.style.color = "#ffcc00";
+            alertBox.style.borderColor = "#ffcc00";
+        }
+
+        renderChart(strike);
+    }
+
+    function renderChart(strike) {
         const ctx = document.getElementById('mainChart').getContext('2d');
-        const data = market.data;
+        if (chartObj) chartObj.destroy();
 
-        new Chart(ctx, {
+        chartObj = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.map(d => d.date),
+                labels: marketData.data.map(d => d.date),
                 datasets: [
                     {
-                        label: 'MSTR Max Pain (L)',
-                        data: data.map(d => d.mstr_pain),
+                        label: 'MSTR Max Pain',
+                        data: marketData.data.map(d => d.mstr_pain),
                         borderColor: '#00ff88',
                         yAxisID: 'yLeft',
-                        // Logic for Red Caret markers
-                        pointStyle: data.map(d => d.is_monthly ? 'triangle' : 'circle'),
-                        pointRadius: data.map(d => d.is_monthly ? 12 : 5),
-                        pointBackgroundColor: data.map(d => d.is_monthly ? '#ff4444' : '#00ff88'),
-                        pointBorderColor: data.map(d => d.is_monthly ? '#fff' : '#00ff88'),
+                        pointStyle: marketData.data.map(d => d.is_monthly ? 'rectRot' : 'circle'),
+                        pointRadius: marketData.data.map(d => d.is_monthly ? 10 : 5),
+                        pointBackgroundColor: marketData.data.map(d => d.is_monthly ? '#ff4444' : '#00ff88'),
                         tension: 0.3
                     },
                     {
-                        label: 'BTC Max Pain (R)',
-                        data: data.map(d => d.btc_pain),
+                        label: 'BTC Max Pain (Right Axis)',
+                        data: marketData.data.map(d => d.btc_pain),
                         borderColor: '#3498db',
                         borderDash: [5, 5],
                         yAxisID: 'yRight',
@@ -68,23 +142,27 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    yLeft: {
-                        type: 'linear', position: 'left',
-                        title: { display: true, text: 'MSTR Price', color: '#00ff88' },
-                        grid: { color: '#222' }
-                    },
-                    yRight: {
-                        type: 'linear', position: 'right',
-                        title: { display: true, text: 'BTC Price', color: '#3498db' },
-                        grid: { drawOnChartArea: false }
-                    }
+                    yLeft: { type: 'linear', position: 'left', grid: { color: '#222' }, title: { display: true, text: 'MSTR ($)' } },
+                    yRight: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'BTC ($)' } }
                 },
-                plugins: {
-                    legend: { labels: { color: '#fff', usePointStyle: true } }
-                }
+                plugins: { legend: { labels: { color: '#fff' } } }
             }
         });
     }
+
+    async function loadTable() {
+        const res = await fetch('./data/history_log.json');
+        const logs = await res.json();
+        document.getElementById('logTable').innerHTML = logs.reverse().map(l => `
+            <tr>
+                <td>${l.date}</td>
+                <td>$${l.spot}</td>
+                <td>$${l.mstr_pain}</td>
+                <td><small>${l.phase}</small></td>
+            </tr>
+        `).join('');
+    }
+
     init();
 </script>
 </body>
