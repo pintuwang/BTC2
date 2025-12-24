@@ -22,7 +22,7 @@ jobs:
         run: pip install requests
         
       - name: Run Monitor
-        run: python monitor.py
+        run: python calculate_pain.py
         
       - name: Commit changes
         run: |
