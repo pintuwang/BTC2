@@ -3,69 +3,58 @@ import json
 import requests
 from datetime import datetime
 
-# --- CONFIGURATION ---
-STRIKE_TARGET = 150  # Your default strike for the log
+def get_max_pain(symbol):
+    # This is a simplified proxy. In your actual script, 
+    # ensure you are looping through the next 6 expiries.
+    # Logic: Fetch option chain -> Calculate sum of losses per strike -> find minimum.
+    expiries = ["2025-12-26", "2026-01-02", "2026-01-09", "2026-01-16", "2026-01-23", "2026-01-30"]
+    data = []
+    for date in expiries:
+        # Placeholder for actual API logic
+        data.append({
+            "date": date,
+            "mstr_pain": 160 + (len(data) * 5), # Simulated trend
+            "btc_pain": 95000 + (len(data) * 1000)
+        })
+    return data
 
-def get_data():
-    # [Your existing data fetching code for MSTR and BTC goes here]
-    # For this example, let's assume 'payload' is your final dictionary
-    payload = {
+def update_files():
+    # 1. GET CURRENT MARKET DATA
+    # Replace with your actual API calls
+    spot_price = 175.50 
+    chain_data = get_max_pain("MSTR")
+
+    full_payload = {
         "last_update": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "spot": 165.50, # Example Spot
-        "data": [
-            {"date": "2025-12-26", "mstr_pain": 170, "btc_pain": 95000},
-            {"date": "2026-01-16", "mstr_pain": 180, "btc_pain": 105000}
-        ]
+        "spot": spot_price,
+        "data": chain_data # This restores the 6-week X-Axis
     }
-    return payload
 
-def calculate_score(spot, weekly_pain, strike):
-    score = 0
-    if spot > strike * 1.10: score += 4
-    if weekly_pain > strike: score += 6
-    return score
+    # 2. SAVE FORWARD-LOOKING CHART DATA
+    os.makedirs('data', exist_ok=True)
+    with open('data/history.json', 'w') as f:
+        json.dump(full_payload, f, indent=4)
 
-def update_history_log(current_payload):
-    folder = 'data'
-    filename = 'history_log.json'
-    filepath = os.path.join(folder, filename)
-    
-    if not os.path.exists(folder):
-        os.makedirs(folder)
-
-    # Load existing
-    if os.path.exists(filepath):
-        with open(filepath, 'r') as f:
-            history = json.load(f)
+    # 3. SAVE HISTORICAL SNAPSHOT FOR TABLE
+    history_log_path = 'data/history_log.json'
+    if os.path.exists(history_log_path):
+        with open(history_log_path, 'r') as f:
+            log = json.load(f)
     else:
-        history = []
+        log = []
 
-    # Prepare today's entry
-    spot = current_payload['spot']
-    weekly_pain = current_payload['data'][0]['mstr_pain']
-    score = calculate_score(spot, weekly_pain, STRIKE_TARGET)
-    
-    log_entry = {
+    new_entry = {
         "date": datetime.now().strftime("%Y-%m-%d"),
-        "spot": spot,
-        "mstr_pain": weekly_pain,
-        "score": score
+        "spot": spot_price,
+        "mstr_pain": chain_data[0]['mstr_pain'], # Track the nearest Friday
+        "score": 10 if spot_price > chain_data[0]['mstr_pain'] else 5
     }
 
-    # Only add if date is new
-    if not history or history[-1]['date'] != log_entry['date']:
-        history.append(log_entry)
-
-    # Save last 30 days
-    with open(filepath, 'w') as f:
-        json.dump(history[-30:], f, indent=4)
+    # Only add if it's a new day
+    if not log or log[-1]['date'] != new_entry['date']:
+        log.append(new_entry)
+        with open(history_log_path, 'w') as f:
+            json.dump(log[-30:], f, indent=4) # Keep last 30 days
 
 if __name__ == "__main__":
-    data = get_data()
-    # Save current state
-    with open('data/history.json', 'w') as f:
-        json.dump(data, f, indent=4)
-    
-    # Save to permanent log
-    update_history_log(data)
-    print("Data and History Log updated successfully.")
+    update_files()
