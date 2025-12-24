@@ -19,7 +19,7 @@ jobs:
           python-version: '3.9'
           
       - name: Install Dependencies
-        run: pip install requests
+        run: pip install yfinance pandas requests
         
       - name: Run Monitor
         run: python calculate_pain.py
