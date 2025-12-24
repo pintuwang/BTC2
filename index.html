@@ -2,185 +2,154 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MSTR/BTC Strategic Monitor</title>
+    <title>MSTR Strategic Monitor - PRO</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #e0e0e0; padding: 20px; }
-        .container { max-width: 1000px; margin: auto; background: #1e1e1e; padding: 25px; border-radius: 12px; }
-        .controls { background: #252525; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 20px; border: 1px solid #333; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #e0e0e0; padding: 20px; }
+        .container { max-width: 1000px; margin: auto; background: #161616; padding: 25px; border-radius: 15px; border: 1px solid #333; }
         
-        /* Phase Tooltip Container */
-        .phase-container { position: relative; display: inline-block; cursor: help; }
-        .phase-tag { font-size: 0.9em; padding: 6px 12px; border-radius: 4px; background: #333; border: 1px solid #444; font-weight: bold; }
-        .phase-tooltip { 
-            visibility: hidden; width: 220px; background-color: #444; color: #fff; text-align: left;
-            border-radius: 6px; padding: 10px; position: absolute; z-index: 10; bottom: 125%; left: 50%;
-            transform: translateX(-50%); opacity: 0; transition: opacity 0.3s; font-size: 0.85em; line-height: 1.4; border: 1px solid #666;
+        /* NEON EMERGENCY ALERT */
+        @keyframes neon-pulse {
+            0% { box-shadow: 0 0 10px #ff0000; background: rgba(255, 0, 0, 0.1); }
+            100% { box-shadow: 0 0 30px #ff0000; background: rgba(255, 0, 0, 0.4); }
         }
-        .phase-container:hover .phase-tooltip { visibility: visible; opacity: 1; }
+        .neon-emergency { animation: neon-pulse 0.6s infinite alternate; border: 2px solid #ff0000 !important; color: white !important; }
 
-        .score-box { text-align: center; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 2px solid transparent; }
-        .safe-bg { background: rgba(0, 255, 136, 0.1); border-color: #00ff88; color: #00ff88; }
-        .caution-bg { background: rgba(255, 204, 0, 0.1); border-color: #ffcc00; color: #ffcc00; }
-        .danger-bg { background: rgba(255, 68, 68, 0.1); border-color: #ff4444; color: #ff4444; }
-
-        input { background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 4px; width: 80px; font-size: 1.1em; outline: none; }
-        input:focus { border-color: #00ff88; }
-        #chart-wrapper { height: 450px; margin-top: 20px; }
-        .legend-note { font-size: 0.85em; color: #888; margin-top: 10px; display: flex; gap: 15px; }
-        .red-dot { color: #ff4444; font-weight: bold; }
+        .score-box { text-align: center; padding: 30px; border-radius: 12px; margin-bottom: 25px; background: #222; border: 1px solid #444; transition: 0.5s; }
+        .safe-text { color: #00ff88; text-shadow: 0 0 10px rgba(0,255,136,0.5); }
+        
+        input { background: #222; color: #00ff88; border: 1px solid #444; padding: 10px; border-radius: 5px; width: 100px; font-weight: bold; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 30px; }
+        th { text-align: left; color: #888; border-bottom: 2px solid #333; padding: 10px; }
+        td { padding: 12px; border-bottom: 1px solid #222; }
+        .trend-up { color: #00ff88; }
+        .trend-down { color: #ff4444; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>MSTR Strategic Put Advisor</h2>
-
-        <div class="controls">
-            <div>
-                <label>Target Strike: $</label>
-                <input type="number" id="strikeInput" value="150" oninput="updateAnalysis()">
-            </div>
-            
-            <div class="phase-container">
-                <div id="phaseDisplay" class="phase-tag">Detecting Phase...</div>
-                <div id="phaseDescription" class="phase-tooltip">
-                    <b>Provisional:</b> Mon/Tue. Data is early/noisy.<br><br>
-                    <b>Sweet Spot:</b> Wed. OI is settled. High accuracy.<br><br>
-                    <b>Reactive:</b> Thu/Fri. Magnet force is at max strength.
-                </div>
-            </div>
-            <div id="last-update" style="font-size: 0.8em; color: #888; margin-left: auto;"></div>
+        <div style="display:flex; justify-content: space-between; align-items: center;">
+            <h2>MSTR Strategic Monitor</h2>
+            <div id="last-update" style="color:#666; font-size:0.8em;"></div>
         </div>
 
-        <div id="scoreBox" class="score-box">
-            <h1 id="scoreValue">--</h1>
-            <p id="scoreLabel">Loading Data...</p>
+        <div class="score-box" id="mainDisplay">
+            <div style="font-size: 0.9em; color: #888; margin-bottom: 10px;">SAFETY SCORE</div>
+            <h1 id="scoreValue" style="font-size: 3em; margin: 0;">--</h1>
+            <p id="scoreLabel" style="font-weight: bold; letter-spacing: 2px;"></p>
         </div>
 
-        <div id="chart-wrapper">
-            <canvas id="maxPainChart"></canvas>
+        <div style="margin-bottom: 20px; display:flex; gap: 20px; align-items: center;">
+            <label>Target Strike: $</label>
+            <input type="number" id="strikeInput" value="150" oninput="refreshUI()">
         </div>
 
-        <div class="legend-note">
-            <span>🟢 MSTR Max Pain</span>
-            <span>🔵 BTC Max Pain (Right Axis)</span>
-            <span><span class="red-dot">◆ Red Diamond:</span> Monthly Expiry (Higher Volume/Stronger Magnet)</span>
+        <div style="height: 350px;">
+            <canvas id="mainChart"></canvas>
         </div>
+
+        <h3>Institutional History (GitHub Log)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>MSTR Spot</th>
+                    <th>Max Pain</th>
+                    <th>Risk Trend</th>
+                </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+        </table>
     </div>
 
 <script>
-    let globalPayload = null;
-    let myChart = null;
+    let marketData = null;
+    let chartInstance = null;
 
-    document.addEventListener('DOMContentLoaded', loadData);
-
-    async function loadData() {
-        try {
-            // Replace with your actual path
-            const response = await fetch('./data/history.json');
-            globalPayload = await response.json();
-            document.getElementById('last-update').innerText = `Updated: ${globalPayload.last_update}`;
-            renderChart();
-            updateAnalysis();
-        } catch (err) {
-            document.getElementById('scoreLabel').innerText = "Waiting for data/history.json...";
-        }
+    async function init() {
+        const resp = await fetch('./data/history.json');
+        marketData = await resp.json();
+        document.getElementById('last-update').innerText = `Sync: ${marketData.last_update}`;
+        refreshUI();
+        loadHistoryTable();
     }
 
-    function isMonthly(dateStr) {
-        const date = new Date(dateStr);
-        const day = date.getDate();
-        // The 3rd Friday of any month must fall between the 15th and 21st
-        return day >= 15 && day <= 21;
-    }
-
-    function getMarketPhase() {
-        const day = new Date().getDay(); 
-        if (day === 1 || day === 2) return { name: "Provisional", color: "#3498db" };
-        if (day === 3) return { name: "Sweet Spot", color: "#00ff88" };
-        if (day === 4 || day === 5) return { name: "Reactive", color: "#ffcc00" };
-        return { name: "Weekend", color: "#888" };
-    }
-
-    function updateAnalysis() {
-        if (!globalPayload) return;
+    function refreshUI() {
         const strike = parseFloat(document.getElementById('strikeInput').value);
-        const spot = globalPayload.spot;
-        const phase = getMarketPhase();
+        const spot = marketData.spot;
+        const pain = marketData.data[0].mstr_pain;
+        const display = document.getElementById('mainDisplay');
         
-        const weeklyPain = globalPayload.data[0].mstr_pain;
-        const monthlyItem = globalPayload.data.find(d => isMonthly(d.date));
-        const monthlyPain = monthlyItem ? monthlyItem.mstr_pain : weeklyPain;
-
-        document.getElementById('phaseDisplay').innerText = `Phase: ${phase.name}`;
-        document.getElementById('phaseDisplay').style.borderColor = phase.color;
-
+        // Score Calculation
         let score = 0;
-        if (spot > strike * 1.12) score += 4; 
-        else if (spot > strike) score += 2;
-        if (weeklyPain > strike) score += 3; 
-        if (monthlyPain > strike) score += 3; 
+        if (spot > strike * 1.10) score += 4;
+        if (pain > strike) score += 6;
 
-        const scoreBox = document.getElementById('scoreBox');
-        document.getElementById('scoreValue').innerText = `Safety Score: ${score}/10`;
-        
-        if (score >= 8) scoreBox.className = "score-box safe-bg";
-        else if (score >= 5) scoreBox.className = "score-box caution-bg";
-        else scoreBox.className = "score-box danger-bg";
-        
-        document.getElementById('scoreLabel').innerText = score >= 8 ? "Safe to Sell" : (score >= 5 ? "Use Caution" : "HIGH RISK");
-        
-        // Dynamic Chart Update: Update point markers if strike changes
-        if(myChart) myChart.update();
+        document.getElementById('scoreValue').innerText = `${score}/10`;
+
+        // Emergency Neon Logic
+        display.className = "score-box";
+        if (spot <= strike * 1.05) {
+            display.classList.add('neon-emergency');
+            document.getElementById('scoreLabel').innerText = "⚠️ EMERGENCY: EXTREME RISK";
+        } else {
+            document.getElementById('scoreLabel').innerText = score >= 8 ? "SAFE TO SELL" : "CAUTION";
+            if (score >= 8) display.classList.add('safe-text');
+        }
+
+        renderChart(strike);
     }
 
-    function renderChart() {
-        const ctx = document.getElementById('maxPainChart').getContext('2d');
-        const labels = globalPayload.data.map(d => d.date);
+    async function loadHistoryTable() {
+        const resp = await fetch('./data/history_log.json');
+        const logs = await resp.json();
+        const strike = document.getElementById('strikeInput').value;
+        const html = logs.reverse().map(log => `
+            <tr>
+                <td>${log.date}</td>
+                <td>$${log.spot}</td>
+                <td>$${log.mstr_pain}</td>
+                <td class="${log.mstr_pain >= strike ? 'trend-up' : 'trend-down'}">
+                    ${log.mstr_pain >= strike ? '🛡️ Protected' : '⚠️ Exposed'}
+                </td>
+            </tr>
+        `).join('');
+        document.getElementById('historyBody').innerHTML = html;
+    }
+
+    function renderChart(strikeLine) {
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
         
-        myChart = new Chart(ctx, {
+        chartInstance = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'MSTR Max Pain',
-                        data: globalPayload.data.map(d => d.mstr_pain),
-                        borderColor: '#00ff88',
-                        pointBackgroundColor: labels.map(d => isMonthly(d) ? '#ff4444' : '#00ff88'),
-                        pointRadius: labels.map(d => isMonthly(d) ? 8 : 4),
-                        pointStyle: labels.map(d => isMonthly(d) ? 'rectRot' : 'circle'),
-                        yAxisID: 'y'
-                    },
-                    {
-                        label: 'BTC Max Pain',
-                        data: globalPayload.data.map(d => d.btc_pain),
-                        borderColor: '#3498db',
-                        borderDash: [5, 5],
-                        yAxisID: 'y1'
-                    }
-                ]
+                labels: marketData.data.map(d => d.date),
+                datasets: [{
+                    label: 'Institutional Floor (Max Pain)',
+                    data: marketData.data.map(d => d.mstr_pain),
+                    borderColor: '#00ff88',
+                    backgroundColor: 'rgba(0, 255, 136, 0.1)',
+                    fill: true
+                }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
                 plugins: {
                     legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            afterLabel: function(context) {
-                                if (isMonthly(context.label)) return "⭐ MONTHLY EXPIRY (High Vol)";
-                            }
-                        }
-                    }
+                    // Simple logic to draw Strike Line
                 },
                 scales: {
-                    y: { grid: { color: '#333' } },
-                    y1: { position: 'right', grid: { display: false } }
+                    y: {
+                        grid: { color: '#222' },
+                        // Manual Strike Line via scale annotation
+                    }
                 }
             }
         });
     }
+
+    init();
 </script>
 </body>
 </html>
