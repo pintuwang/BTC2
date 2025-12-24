@@ -2,108 +2,126 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MSTR/BTC Strategic Monitor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MSTR Strategic Monitor</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; padding: 20px; }
-        .container { max-width: 1200px; margin: auto; background: #111; padding: 25px; border-radius: 15px; border: 1px solid #333; }
+        :root { --bg: #0a0a0a; --card: #111; --green: #00ff88; --red: #ff4444; --yellow: #ffcc00; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: #fff; padding: 20px; }
+        .container { max-width: 1100px; margin: auto; background: var(--card); padding: 25px; border-radius: 15px; border: 1px solid #333; }
         
-        /* Neon Alert */
-        @keyframes pulse-red { 0% { box-shadow: 0 0 5px #ff0000; } 100% { box-shadow: 0 0 25px #ff0000; } }
-        .emergency { animation: pulse-red 0.5s infinite alternate; border: 2px solid #ff0000 !important; }
+        /* 🚨 Neon Alert Animation */
+        @keyframes pulse-red { 0% { box-shadow: 0 0 5px #ff0000; border-color: #ff0000; } 100% { box-shadow: 0 0 25px #ff0000; border-color: #ff4444; } }
+        .emergency { animation: pulse-red 0.6s infinite alternate; background: #200 !important; }
 
-        .score-card { text-align: center; padding: 30px; border-radius: 12px; background: #1a1a1a; border: 1px solid #333; margin-bottom: 20px; transition: 0.3s; }
-        .phase-badge { display: inline-block; padding: 5px 15px; border-radius: 20px; font-size: 0.8em; font-weight: bold; background: #333; margin-top: 10px; }
+        .score-card { text-align: center; padding: 25px; border-radius: 12px; background: #1a1a1a; border: 1px solid #333; margin-bottom: 20px; transition: 0.3s; }
+        .phase-badge { display: inline-block; padding: 6px 16px; border-radius: 20px; font-size: 0.75em; font-weight: 800; background: #333; text-transform: uppercase; margin-top: 10px; color: #aaa; }
         
-        .controls { display: flex; justify-content: space-between; align-items: center; background: #222; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
-        input { background: #000; color: #00ff88; border: 1px solid #444; padding: 8px; border-radius: 5px; width: 100px; font-weight: bold; font-size: 1.1em; }
+        .controls { display: flex; justify-content: space-between; align-items: center; background: #181818; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #222; }
+        input { background: #000; color: var(--green); border: 1px solid #444; padding: 10px; border-radius: 5px; width: 100px; font-weight: bold; font-size: 1.2em; text-align: center; }
         
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #151515; border-radius: 8px; overflow: hidden; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #222; }
-        th { background: #222; color: #888; font-size: 0.8em; text-transform: uppercase; }
+        #sgtClock { color: #888; font-size: 0.9em; font-weight: 600; }
+        .legend-item { color: var(--red); font-weight: bold; font-size: 0.8em; margin-top: 5px; }
         
-        .legend-item { color: #ff4444; font-weight: bold; font-size: 0.85em; }
+        table { width: 100%; border-collapse: collapse; margin-top: 30px; background: #111; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 14px; text-align: left; border-bottom: 1px solid #222; }
+        th { background: #1a1a1a; color: #666; font-size: 0.75em; text-transform: uppercase; letter-spacing: 1px; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="score-card" id="alertBox">
-            <h1 id="scoreDisplay" style="font-size: 4em; margin: 0;">--</h1>
-            <div id="phaseDisplay" class="phase-badge">Detecting Phase...</div>
-            <p id="safetyMsg" style="margin-top: 15px; font-weight: bold; letter-spacing: 1px;"></p>
-        </div>
 
-        <div class="controls">
-            <div>
-                <label style="color:#888;">TARGET STRIKE: </label>
-                <input type="number" id="strikeInput" value="150" oninput="updateUI()">
-            </div>
-            <div style="text-align: right;">
-                <div id="sgtClock" style="font-weight: 500;">SGT: --</div>
-                <div class="legend-item">◆ RED DIAMOND = Monthly Expiry</div>
-            </div>
-        </div>
-
-        <div style="height: 450px;">
-            <canvas id="mainChart"></canvas>
-        </div>
-
-        <h3 style="margin-top:40px; color: #888;">Historical Log (30 Days)</h3>
-        <table>
-            <thead><tr><th>Date</th><th>MSTR Spot</th><th>Weekly Pain</th><th>Phase</th></tr></thead>
-            <tbody id="logTable"></tbody>
-        </table>
+<div class="container">
+    <div class="score-card" id="alertBox">
+        <div id="phaseDisplay" class="phase-badge">Detecting Market Phase...</div>
+        <h1 id="scoreDisplay" style="font-size: 4.5em; margin: 10px 0;">--</h1>
+        <p id="safetyMsg" style="margin: 0; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;"></p>
     </div>
+
+    <div class="controls">
+        <div>
+            <label style="color:#666; font-size: 0.8em; font-weight: bold; display: block; margin-bottom: 5px;">YOUR PUT STRIKE ($)</label>
+            <input type="number" id="strikeInput" value="150" oninput="updateUI()">
+        </div>
+        <div style="text-align: right;">
+            <div id="sgtClock">SGT: Loading...</div>
+            <div class="legend-item">◆ RED DIAMOND = Monthly Expiry</div>
+        </div>
+    </div>
+
+    <div style="height: 480px;">
+        <canvas id="mainChart"></canvas>
+    </div>
+
+    <h3 style="margin-top:40px; color: #444; text-transform: uppercase; font-size: 0.9em;">Historical Performance (30 Days)</h3>
+    <table>
+        <thead><tr><th>Date</th><th>MSTR Spot</th><th>Institutional Magnet</th><th>Phase</th></tr></thead>
+        <tbody id="logTable"></tbody>
+    </table>
+</div>
 
 <script>
     let marketData = null;
     let chartObj = null;
 
     async function init() {
-        const res = await fetch('./data/history.json');
-        marketData = await res.json();
-        
-        // SGT Time conversion
-        const utc = new Date(marketData.last_update_utc);
-        document.getElementById('sgtClock').innerText = `SGT: ${utc.toLocaleString('en-SG', {timeZone:'Asia/Singapore', dateStyle:'medium', timeStyle:'short'})}`;
-        
-        updateUI();
-        loadTable();
+        try {
+            const res = await fetch('./data/history.json');
+            marketData = await res.json();
+            
+            // ✅ Reliable Singapore Time conversion
+            const utcDate = new Date(marketData.last_update_utc);
+            document.getElementById('sgtClock').innerText = `SGT: ${utcDate.toLocaleString('en-SG', {
+                timeZone: 'Asia/Singapore',
+                hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short'
+            })}`;
+            
+            updateUI();
+            loadTable();
+        } catch (e) { console.error("Data fetch error:", e); }
     }
 
     function updateUI() {
         const strike = parseFloat(document.getElementById('strikeInput').value);
         const spot = marketData.spot;
-        const pain = marketData.data[0].mstr_pain;
-        const phase = marketData.phase;
-
-        // Safety Score Logic
+        const magnet = marketData.data[0].mstr_pain; // Closest expiry magnet
+        
+        // 🛡️ Safety Score Logic (Per Manual)
         let score = 0;
         if (spot > strike * 1.15) score += 4;
         else if (spot > strike) score += 2;
-        if (pain > strike) score += 6;
+        if (magnet > strike) score += 6;
 
-        document.getElementById('scoreDisplay').innerText = `${score}/10`;
-        document.getElementById('phaseDisplay').innerText = phase;
-        
+        const scoreDisp = document.getElementById('scoreDisplay');
         const alertBox = document.getElementById('alertBox');
         const msg = document.getElementById('safetyMsg');
 
+        scoreDisp.innerText = `${score}/10`;
+        document.getElementById('phaseDisplay').innerText = marketData.phase;
+
         // Reset Styles
         alertBox.className = "score-card";
-        
+        alertBox.style.borderColor = "#333";
+
+        // 🚨 Safety Thresholds
         if (spot <= strike * 1.05) {
             alertBox.classList.add('emergency');
             msg.innerText = "🔴 DANGER: PRICE NEAR STRIKE";
             msg.style.color = "#ff4444";
+            scoreDisp.style.color = "#ff4444";
         } else if (score >= 8) {
             msg.innerText = "🟢 SAFE: INSTITUTIONAL FLOOR DETECTED";
             msg.style.color = "#00ff88";
+            scoreDisp.style.color = "#00ff88";
             alertBox.style.borderColor = "#00ff88";
-        } else {
-            msg.innerText = "🟡 CAUTION: MONITOR MAGNET TREND";
+        } else if (score >= 5) {
+            msg.innerText = "🟡 CAUTION: PRICE ACTION CLOSING IN";
             msg.style.color = "#ffcc00";
+            scoreDisp.style.color = "#ffcc00";
             alertBox.style.borderColor = "#ffcc00";
+        } else {
+            msg.innerText = "🔴 DANGER: MAGNET BELOW STRIKE";
+            msg.style.color = "#ff4444";
+            scoreDisp.style.color = "#ff4444";
         }
 
         renderChart(strike);
@@ -119,21 +137,26 @@
                 labels: marketData.data.map(d => d.date),
                 datasets: [
                     {
-                        label: 'MSTR Max Pain',
+                        label: 'MSTR Magnet',
                         data: marketData.data.map(d => d.mstr_pain),
                         borderColor: '#00ff88',
+                        backgroundColor: 'rgba(0, 255, 136, 0.1)',
                         yAxisID: 'yLeft',
+                        fill: true,
+                        // ◆ Red Diamonds logic
                         pointStyle: marketData.data.map(d => d.is_monthly ? 'rectRot' : 'circle'),
                         pointRadius: marketData.data.map(d => d.is_monthly ? 10 : 5),
                         pointBackgroundColor: marketData.data.map(d => d.is_monthly ? '#ff4444' : '#00ff88'),
+                        pointBorderColor: '#fff',
                         tension: 0.3
                     },
                     {
-                        label: 'BTC Max Pain (Right Axis)',
+                        label: 'BTC Index (Right Axis)',
                         data: marketData.data.map(d => d.btc_pain),
                         borderColor: '#3498db',
                         borderDash: [5, 5],
                         yAxisID: 'yRight',
+                        pointRadius: 0, // Keep BTC line clean
                         tension: 0.3
                     }
                 ]
@@ -142,10 +165,12 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    yLeft: { type: 'linear', position: 'left', grid: { color: '#222' }, title: { display: true, text: 'MSTR ($)' } },
-                    yRight: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'BTC ($)' } }
+                    yLeft: { type: 'linear', position: 'left', grid: { color: '#222' }, title: { display: true, text: 'MSTR ($)', color: '#666' } },
+                    yRight: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'BTC Index ($)', color: '#666' } }
                 },
-                plugins: { legend: { labels: { color: '#fff' } } }
+                plugins: {
+                    legend: { labels: { color: '#fff', font: { size: 12 }, usePointStyle: true } }
+                }
             }
         });
     }
@@ -156,9 +181,9 @@
         document.getElementById('logTable').innerHTML = logs.reverse().map(l => `
             <tr>
                 <td>${l.date}</td>
-                <td>$${l.spot}</td>
-                <td>$${l.mstr_pain}</td>
-                <td><small>${l.phase}</small></td>
+                <td style="font-weight:bold;">$${l.spot}</td>
+                <td style="color:#00ff88;">$${l.mstr_pain}</td>
+                <td><span style="font-size:0.8em; color:#888;">${l.phase}</span></td>
             </tr>
         `).join('');
     }
