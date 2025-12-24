@@ -30,4 +30,5 @@ jobs:
           git config --local user.name "GitHub Action"
           git add data/*.json
           git commit -m "Update Market Data and History Log [skip ci]" || exit 0
+          git pull --rebase origin main
           git push
