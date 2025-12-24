@@ -1,42 +1,42 @@
 {
-    "last_update_utc": "2025-12-24T08:08:01.626059",
+    "last_update_utc": "2025-12-24T08:08:50.194874",
     "spot": 178.5,
     "phase": "Sweet Spot (Wednesday)",
     "data": [
         {
             "date": "2025-12-26",
             "mstr_pain": 165,
-            "btc_pain": 86388.08,
+            "btc_pain": 86368.99,
             "is_monthly": false
         },
         {
             "date": "2026-01-02",
             "mstr_pain": 169,
-            "btc_pain": 87988.08,
+            "btc_pain": 87968.99,
             "is_monthly": false
         },
         {
             "date": "2026-01-09",
             "mstr_pain": 173,
-            "btc_pain": 88588.08,
+            "btc_pain": 88568.99,
             "is_monthly": false
         },
         {
             "date": "2026-01-16",
             "mstr_pain": 177,
-            "btc_pain": 90188.08,
+            "btc_pain": 90168.99,
             "is_monthly": true
         },
         {
             "date": "2026-01-23",
             "mstr_pain": 181,
-            "btc_pain": 90788.08,
+            "btc_pain": 90768.99,
             "is_monthly": false
         },
         {
             "date": "2026-01-30",
             "mstr_pain": 185,
-            "btc_pain": 92388.08,
+            "btc_pain": 92368.99,
             "is_monthly": false
         }
     ]
