@@ -1,23 +1,53 @@
 {
-    "last_update_utc": "2025-12-24T11:08:57.614846Z",
+    "last_update_utc": "2025-12-24T13:27:32.134116Z",
     "spot": 157.88,
     "data": [
         {
+            "date": "2025-12-26",
+            "mstr_pain": 160.0,
+            "btc_pain": 95000.0,
+            "is_monthly": false
+        },
+        {
+            "date": "2026-01-02",
+            "mstr_pain": 165.0,
+            "btc_pain": 88000.0,
+            "is_monthly": false
+        },
+        {
+            "date": "2026-01-09",
+            "mstr_pain": 180.0,
+            "btc_pain": 88000.0,
+            "is_monthly": false
+        },
+        {
             "date": "2026-01-16",
-            "mstr_pain": 20.0,
+            "mstr_pain": 160.0,
             "btc_pain": 88000.0,
             "is_monthly": true
         },
         {
+            "date": "2026-01-23",
+            "mstr_pain": 190.0,
+            "btc_pain": 90000.0,
+            "is_monthly": false
+        },
+        {
+            "date": "2026-01-30",
+            "mstr_pain": 190.0,
+            "btc_pain": 90000.0,
+            "is_monthly": false
+        },
+        {
             "date": "2026-02-20",
-            "mstr_pain": 480.0,
+            "mstr_pain": 165.0,
             "btc_pain": 90000.0,
             "is_monthly": true
         },
         {
             "date": "2026-03-20",
-            "mstr_pain": 840.0,
-            "btc_pain": 100000.0,
+            "mstr_pain": 220.0,
+            "btc_pain": 95000.0,
             "is_monthly": true
         }
     ]
