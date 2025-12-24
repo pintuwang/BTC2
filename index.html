@@ -2,28 +2,28 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MSTR/BTC Strategic Monitor</title>
+    <title>MSTR Strategic Monitor - Volume Overlay</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #e0e0e0; padding: 20px; }
-        .container { max-width: 1000px; margin: auto; background: #1e1e1e; padding: 25px; border-radius: 12px; }
+        .container { max-width: 1100px; margin: auto; background: #1e1e1e; padding: 25px; border-radius: 12px; }
         .controls { background: #252525; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 20px; border: 1px solid #333; }
-        .score-box { text-align: center; padding: 20px; border-radius: 8px; margin-bottom: 20px; transition: 0.3s; border: 1px solid #444; }
-        .safe-bg { background: #004d26; border-color: #00ff88; }
-        .caution-bg { background: #4d3300; border-color: #ffcc00; }
-        .danger-bg { background: #4d0000; border-color: #ff4444; }
+        .score-box { text-align: center; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #444; }
+        .safe-bg { background: rgba(0, 255, 136, 0.1); border-color: #00ff88; color: #00ff88; }
+        .caution-bg { background: rgba(255, 204, 0, 0.1); border-color: #ffcc00; color: #ffcc00; }
+        .danger-bg { background: rgba(255, 68, 68, 0.1); border-color: #ff4444; color: #ff4444; }
         input { background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 4px; width: 80px; font-size: 1.1em; }
-        #chart-wrapper { height: 400px; margin-top: 20px; }
-        .legend-note { font-size: 0.85em; color: #888; margin-top: 15px; line-height: 1.6; }
+        #chart-wrapper { height: 500px; margin-top: 20px; }
+        .legend-note { font-size: 0.85em; color: #888; margin-top: 15px; display: flex; gap: 20px; justify-content: center;}
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>MSTR Strategic Put Advisor</h2>
+        <h2>MSTR Strategic Put Advisor (Volume & Price)</h2>
 
         <div class="controls">
             <div>
-                <label>Your Target Strike: $</label>
+                <label>Target Strike: $</label>
                 <input type="number" id="strikeInput" value="150" oninput="updateAnalysis()">
             </div>
             <div id="last-update" style="font-size: 0.8em; color: #888; margin-left: auto;"></div>
@@ -31,7 +31,7 @@
 
         <div id="scoreBox" class="score-box">
             <h1 id="scoreValue">--</h1>
-            <p id="scoreLabel">Loading Data...</p>
+            <p id="scoreLabel">Filtering Market Data...</p>
         </div>
 
         <div id="chart-wrapper">
@@ -39,8 +39,9 @@
         </div>
 
         <div class="legend-note">
-            🟢 <b>Green Line:</b> MSTR Max Pain Magnet (Price gravitates here at expiry) <br>
-            🔵 <b>Blue Line:</b> BTC Max Pain Magnet (Shows underlying support trend)
+            <span>🟢 MSTR Price Magnet</span>
+            <span>🔵 BTC Price Magnet</span>
+            <span>📊 Bars: Call (Green) / Put (Red) Volume</span>
         </div>
     </div>
 
@@ -53,12 +54,21 @@
     async function loadData() {
         try {
             const response = await fetch('./data/history.json');
-            globalPayload = await response.json();
-            document.getElementById('last-update').innerText = `Sync: ${globalPayload.last_update}`;
+            const rawData = await response.json();
+            
+            // --- THE FILTER LOGIC ---
+            // Only keep points where price is logical (between 30% and 500% of spot)
+            const spot = rawData.spot;
+            globalPayload = {
+                ...rawData,
+                data: rawData.data.filter(d => d.mstr_pain > (spot * 0.3) && d.mstr_pain < (spot * 5))
+            };
+
+            document.getElementById('last-update').innerText = `Last Sync: ${globalPayload.last_update}`;
             renderChart();
             updateAnalysis();
         } catch (err) {
-            document.getElementById('scoreLabel').innerText = "Data error. Check history.json.";
+            document.getElementById('scoreLabel').innerText = "Data missing. Run Python script.";
         }
     }
 
@@ -66,46 +76,80 @@
         if (!globalPayload) return;
         const strike = parseFloat(document.getElementById('strikeInput').value);
         const spot = globalPayload.spot;
-        const weeklyPain = globalPayload.data[0].mstr_pain;
+        const weeklyPain = globalPayload.data[0]?.mstr_pain || 0;
 
         let score = 0;
-        if (spot > strike * 1.10) score += 5; // Price Buffer
-        else if (spot > strike) score += 2;
-        if (weeklyPain > strike) score += 5; // Magnet protection
+        if (spot > strike * 1.10) score += 5; 
+        if (weeklyPain > strike) score += 5; 
 
         const scoreBox = document.getElementById('scoreBox');
         document.getElementById('scoreValue').innerText = `Safety Score: ${score}/10`;
         
-        if (score >= 8) {
-            scoreBox.className = "score-box safe-bg";
-            document.getElementById('scoreLabel').innerText = "SAFE: Strike is well protected.";
-        } else if (score >= 5) {
-            scoreBox.className = "score-box caution-bg";
-            document.getElementById('scoreLabel').innerText = "CAUTION: Monitor price closely.";
-        } else {
-            scoreBox.className = "score-box danger-bg";
-            document.getElementById('scoreLabel').innerText = "DANGER: High risk of assignment.";
-        }
+        if (score >= 8) scoreBox.className = "score-box safe-bg";
+        else if (score >= 5) scoreBox.className = "score-box caution-bg";
+        else scoreBox.className = "score-box danger-bg";
+        
+        document.getElementById('scoreLabel').innerText = score >= 8 ? "SAFE" : (score >= 5 ? "CAUTION" : "DANGER");
     }
 
     function renderChart() {
         const ctx = document.getElementById('maxPainChart').getContext('2d');
         const labels = globalPayload.data.map(d => d.date);
+
         myChart = new Chart(ctx, {
-            type: 'line',
             data: {
                 labels: labels,
                 datasets: [
-                    { label: 'MSTR Pain', data: globalPayload.data.map(d => d.mstr_pain), borderColor: '#00ff88', yAxisID: 'y' },
-                    { label: 'BTC Pain', data: globalPayload.data.map(d => d.btc_pain), borderColor: '#3498db', yAxisID: 'y1', borderDash: [5,5] }
+                    // VOLUME BARS (Overlay)
+                    {
+                        type: 'bar',
+                        label: 'Calls (OI)',
+                        data: globalPayload.data.map(d => d.call_oi || 0),
+                        backgroundColor: 'rgba(0, 255, 136, 0.2)',
+                        yAxisID: 'yVol',
+                        stack: 'stack1'
+                    },
+                    {
+                        type: 'bar',
+                        label: 'Puts (OI)',
+                        data: globalPayload.data.map(d => d.put_oi || 0),
+                        backgroundColor: 'rgba(255, 68, 68, 0.2)',
+                        yAxisID: 'yVol',
+                        stack: 'stack1'
+                    },
+                    // PRICE LINES
+                    {
+                        type: 'line',
+                        label: 'MSTR Max Pain',
+                        data: globalPayload.data.map(d => d.mstr_pain),
+                        borderColor: '#00ff88',
+                        borderWidth: 3,
+                        yAxisID: 'yPrice',
+                        tension: 0.3
+                    },
+                    {
+                        type: 'line',
+                        label: 'BTC Max Pain',
+                        data: globalPayload.data.map(d => d.btc_pain),
+                        borderColor: '#3498db',
+                        borderDash: [5, 5],
+                        yAxisID: 'yBTC',
+                        tension: 0.3
+                    }
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    y: { type: 'linear', position: 'left' },
-                    y1: { type: 'linear', position: 'right', grid: { display: false } }
+                    yPrice: { type: 'linear', position: 'left', title: { display: true, text: 'MSTR Price ($)' } },
+                    yBTC: { type: 'linear', position: 'right', grid: { display: false }, title: { display: true, text: 'BTC Price ($)' } },
+                    yVol: { 
+                        type: 'linear', 
+                        position: 'right', 
+                        display: false, // Keep it clean, volume is for visual weight
+                        grid: { display: false } 
+                    }
                 }
             }
         });
