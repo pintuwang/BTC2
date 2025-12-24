@@ -5,151 +5,136 @@
     <title>MSTR Strategic Monitor - PRO</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #e0e0e0; padding: 20px; }
-        .container { max-width: 1000px; margin: auto; background: #161616; padding: 25px; border-radius: 15px; border: 1px solid #333; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0d0d0d; color: #e0e0e0; padding: 20px; }
+        .container { max-width: 1000px; margin: auto; background: #1a1a1a; padding: 25px; border-radius: 12px; border: 1px solid #333; }
         
-        /* NEON EMERGENCY ALERT */
+        /* Neon Emergency Alert */
         @keyframes neon-pulse {
             0% { box-shadow: 0 0 10px #ff0000; background: rgba(255, 0, 0, 0.1); }
-            100% { box-shadow: 0 0 30px #ff0000; background: rgba(255, 0, 0, 0.4); }
+            100% { box-shadow: 0 0 30px #ff0000; background: rgba(255, 0, 0, 0.5); }
         }
-        .neon-emergency { animation: neon-pulse 0.6s infinite alternate; border: 2px solid #ff0000 !important; color: white !important; }
+        .emergency { animation: neon-pulse 0.5s infinite alternate; border: 2px solid red !important; }
 
-        .score-box { text-align: center; padding: 30px; border-radius: 12px; margin-bottom: 25px; background: #222; border: 1px solid #444; transition: 0.5s; }
-        .safe-text { color: #00ff88; text-shadow: 0 0 10px rgba(0,255,136,0.5); }
-        
-        input { background: #222; color: #00ff88; border: 1px solid #444; padding: 10px; border-radius: 5px; width: 100px; font-weight: bold; }
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 30px; }
-        th { text-align: left; color: #888; border-bottom: 2px solid #333; padding: 10px; }
-        td { padding: 12px; border-bottom: 1px solid #222; }
-        .trend-up { color: #00ff88; }
-        .trend-down { color: #ff4444; }
+        .score-box { text-align: center; padding: 20px; border-radius: 10px; background: #222; margin-bottom: 20px; transition: 0.5s; }
+        .controls { display: flex; gap: 20px; align-items: center; margin-bottom: 20px; padding: 15px; background: #252525; border-radius: 8px; }
+        input { background: #333; color: #00ff88; border: 1px solid #555; padding: 8px; border-radius: 4px; font-weight: bold; width: 80px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.9em; }
+        th { text-align: left; color: #777; border-bottom: 2px solid #333; padding: 10px; }
+        td { padding: 10px; border-bottom: 1px solid #222; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div style="display:flex; justify-content: space-between; align-items: center;">
-            <h2>MSTR Strategic Monitor</h2>
-            <div id="last-update" style="color:#666; font-size:0.8em;"></div>
+        <div class="score-box" id="alertBox">
+            <h1 id="scoreVal" style="font-size: 3em; margin:0;">--</h1>
+            <p id="scoreText" style="letter-spacing: 2px; font-weight: bold;"></p>
         </div>
 
-        <div class="score-box" id="mainDisplay">
-            <div style="font-size: 0.9em; color: #888; margin-bottom: 10px;">SAFETY SCORE</div>
-            <h1 id="scoreValue" style="font-size: 3em; margin: 0;">--</h1>
-            <p id="scoreLabel" style="font-weight: bold; letter-spacing: 2px;"></p>
-        </div>
-
-        <div style="margin-bottom: 20px; display:flex; gap: 20px; align-items: center;">
+        <div class="controls">
             <label>Target Strike: $</label>
-            <input type="number" id="strikeInput" value="150" oninput="refreshUI()">
+            <input type="number" id="strikeInput" value="150" oninput="updateUI()">
+            <div id="syncTime" style="margin-left: auto; color: #555; font-size: 0.8em;"></div>
         </div>
 
-        <div style="height: 350px;">
-            <canvas id="mainChart"></canvas>
+        <div style="height: 400px; position: relative;">
+            <canvas id="chartCanvas"></canvas>
         </div>
 
-        <h3>Institutional History (GitHub Log)</h3>
+        <h3>Historical Safety Log</h3>
         <table>
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>MSTR Spot</th>
-                    <th>Max Pain</th>
-                    <th>Risk Trend</th>
-                </tr>
-            </thead>
-            <tbody id="historyBody"></tbody>
+            <thead><tr><th>Date</th><th>MSTR Spot</th><th>Max Pain</th><th>Status</th></tr></thead>
+            <tbody id="logTable"></tbody>
         </table>
     </div>
 
 <script>
-    let marketData = null;
-    let chartInstance = null;
+    let mainData = null;
+    let chart = null;
 
-    async function init() {
-        const resp = await fetch('./data/history.json');
-        marketData = await resp.json();
-        document.getElementById('last-update').innerText = `Sync: ${marketData.last_update}`;
-        refreshUI();
-        loadHistoryTable();
+    async function start() {
+        const r1 = await fetch('./data/history.json');
+        mainData = await r1.json();
+        document.getElementById('syncTime').innerText = `Last Sync: ${mainData.last_update}`;
+        
+        updateUI();
+        loadTable();
     }
 
-    function refreshUI() {
+    function updateUI() {
         const strike = parseFloat(document.getElementById('strikeInput').value);
-        const spot = marketData.spot;
-        const pain = marketData.data[0].mstr_pain;
-        const display = document.getElementById('mainDisplay');
-        
-        // Score Calculation
+        const spot = mainData.spot;
+        const pain = mainData.data[0].mstr_pain;
+
+        // Score logic
         let score = 0;
-        if (spot > strike * 1.10) score += 4;
+        if (spot > strike * 1.15) score += 4;
         if (pain > strike) score += 6;
 
-        document.getElementById('scoreValue').innerText = `${score}/10`;
-
-        // Emergency Neon Logic
-        display.className = "score-box";
+        document.getElementById('scoreVal').innerText = `${score}/10`;
+        const alertBox = document.getElementById('alertBox');
+        
+        // Emergency Flash
         if (spot <= strike * 1.05) {
-            display.classList.add('neon-emergency');
-            document.getElementById('scoreLabel').innerText = "⚠️ EMERGENCY: EXTREME RISK";
+            alertBox.className = "score-box emergency";
+            document.getElementById('scoreText').innerText = "⚠️ PRICE NEAR STRIKE";
         } else {
-            document.getElementById('scoreLabel').innerText = score >= 8 ? "SAFE TO SELL" : "CAUTION";
-            if (score >= 8) display.classList.add('safe-text');
+            alertBox.className = "score-box";
+            alertBox.style.color = score >= 8 ? "#00ff88" : "#ffcc00";
+            document.getElementById('scoreText').innerText = score >= 8 ? "SAFE ZONE" : "CAUTION";
         }
 
         renderChart(strike);
     }
 
-    async function loadHistoryTable() {
-        const resp = await fetch('./data/history_log.json');
-        const logs = await resp.json();
-        const strike = document.getElementById('strikeInput').value;
-        const html = logs.reverse().map(log => `
+    async function loadTable() {
+        const r2 = await fetch('./data/history_log.json');
+        const logs = await r2.json();
+        document.getElementById('logTable').innerHTML = logs.reverse().map(l => `
             <tr>
-                <td>${log.date}</td>
-                <td>$${log.spot}</td>
-                <td>$${log.mstr_pain}</td>
-                <td class="${log.mstr_pain >= strike ? 'trend-up' : 'trend-down'}">
-                    ${log.mstr_pain >= strike ? '🛡️ Protected' : '⚠️ Exposed'}
-                </td>
+                <td>${l.date}</td>
+                <td>$${l.spot.toFixed(2)}</td>
+                <td>$${l.mstr_pain}</td>
+                <td style="color:${l.score >= 8 ? '#00ff88' : '#ff4444'}">${l.score >= 8 ? '✓ Safe' : '⚠ Risk'}</td>
             </tr>
         `).join('');
-        document.getElementById('historyBody').innerHTML = html;
     }
 
-    function renderChart(strikeLine) {
-        const ctx = document.getElementById('mainChart').getContext('2d');
-        if (chartInstance) chartInstance.destroy();
-        
-        chartInstance = new Chart(ctx, {
+    function renderChart(strike) {
+        const ctx = document.getElementById('chartCanvas').getContext('2d');
+        if (chart) chart.destroy();
+
+        chart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: marketData.data.map(d => d.date),
-                datasets: [{
-                    label: 'Institutional Floor (Max Pain)',
-                    data: marketData.data.map(d => d.mstr_pain),
-                    borderColor: '#00ff88',
-                    backgroundColor: 'rgba(0, 255, 136, 0.1)',
-                    fill: true
-                }]
+                labels: mainData.data.map(d => d.date),
+                datasets: [
+                    {
+                        label: 'MSTR Max Pain',
+                        data: mainData.data.map(d => d.mstr_pain),
+                        borderColor: '#00ff88',
+                        tension: 0.3
+                    },
+                    {
+                        label: 'BTC Proxy (Blue)',
+                        data: mainData.data.map(d => d.btc_pain / 500), // Scaled to fit MSTR chart
+                        borderColor: '#3498db',
+                        borderDash: [5, 5],
+                        tension: 0.3
+                    }
+                ]
             },
             options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { grid: { color: '#222' } } },
                 plugins: {
-                    legend: { display: false },
-                    // Simple logic to draw Strike Line
-                },
-                scales: {
-                    y: {
-                        grid: { color: '#222' },
-                        // Manual Strike Line via scale annotation
-                    }
+                    legend: { position: 'bottom' }
                 }
             }
         });
     }
 
-    init();
+    start();
 </script>
 </body>
 </html>
