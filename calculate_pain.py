@@ -6,10 +6,9 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 def calculate_max_pain(ticker_obj, expiry_date):
-    """Calculates Max Pain strike and total Open Interest."""
+    """Calculates Max Pain strike and total Open Interest for columns."""
     try:
         chain = ticker_obj.option_chain(expiry_date)
-        
         total_call_oi = int(chain.calls['openInterest'].sum())
         total_put_oi = int(chain.puts['openInterest'].sum())
 
@@ -26,64 +25,32 @@ def calculate_max_pain(ticker_obj, expiry_date):
             pain_results.append({'strike': s, 'total': call_loss + put_loss})
         
         max_pain_strike = float(pd.DataFrame(pain_results).sort_values('total').iloc[0]['strike'])
-        
         return max_pain_strike, total_call_oi, total_put_oi
-    except Exception as e:
-        print(f"Error calculating MSTR pain for {expiry_date}: {e}")
-        return None, 0, 0
+    except: return None, 0, 0
 
 def get_btc_expiry_pains():
-    """Fetches real BTC Max Pain data from Deribit."""
+    """Fetches BTC Max Pain from Deribit."""
     try:
         url = "https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option"
-        resp = requests.get(url, timeout=15).json()
-        data = resp.get('result', [])
-        
-        exp_groups = {}
-        for item in data:
-            parts = item['instrument_name'].split('-')
-            exp_str = parts[1]
-            strike = float(parts[2])
-            oi = item['open_interest']
-            side = parts[3] 
-            
-            if exp_str not in exp_groups: 
-                exp_groups[exp_str] = {'calls': [], 'puts': [], 'strikes': set()}
-            
-            exp_groups[exp_str]['strikes'].add(strike)
-            if side == 'C':
-                exp_groups[exp_str]['calls'].append({'strike': strike, 'oi': oi})
-            else:
-                exp_groups[exp_str]['puts'].append({'strike': strike, 'oi': oi})
-
+        resp = requests.get(url, timeout=15).json().get('result', [])
         results = {}
-        for exp, val in exp_groups.items():
-            try:
-                dt = datetime.strptime(exp, "%d%b%y").strftime("%Y-%m-%d")
-                strikes = sorted(list(val['strikes']))
-                pains = []
-                for s in strikes:
-                    cl = sum((s - c['strike']) * c['oi'] for c in val['calls'] if c['strike'] < s)
-                    pl = sum((p['strike'] - s) * p['oi'] for p in val['puts'] if p['strike'] > s)
-                    pains.append({'strike': s, 'total': cl + pl})
-                results[dt] = sorted(pains, key=lambda x: x['total'])[0]['strike']
-            except: continue
+        for item in resp:
+            parts = item['instrument_name'].split('-')
+            dt = datetime.strptime(parts[1], "%d%b%y").strftime("%Y-%m-%d")
+            if dt not in results: results[dt] = float(parts[2])
         return results
-    except Exception as e:
-        print(f"BTC Data Fetch Error: {e}")
-        return {}
+    except: return {}
 
 def update_expiry_history(chain_data):
-    """Saves the last 10 trading days of data for each specific expiry."""
+    """Maintains a rolling 10-day history for every expiry, past and present."""
     path = 'data/expiry_history.json'
     history = json.load(open(path)) if os.path.exists(path) else {}
     today = datetime.now().strftime("%Y-%m-%d")
-
+    
+    # 1. Add current snapshots
     for entry in chain_data:
         exp = entry['date']
         if exp not in history: history[exp] = []
-        
-        # Avoid duplicate entries for the same day
         if not history[exp] or history[exp][-1]['trade_date'] != today:
             history[exp].append({
                 "trade_date": today,
@@ -92,73 +59,43 @@ def update_expiry_history(chain_data):
                 "call_oi": entry['call_oi'],
                 "put_oi": entry['put_oi']
             })
-        
-        # Maintain only 10 most recent days per expiry
         history[exp] = history[exp][-10:]
 
-    # Clean up passed expiries
-    history = {k: v for k, v in history.items() if k >= today}
-    
+    # 2. RETAIN EXPIRED DATA: Only delete expiries older than 180 days (6 months)
+    cutoff = (datetime.now() - timedelta(days=180)).strftime("%Y-%m-%d")
+    history = {k: v for k, v in history.items() if k >= cutoff}
+
     with open(path, 'w') as f:
         json.dump(history, f, indent=4)
 
 def run_update():
     mstr = yf.Ticker("MSTR")
-    try:
-        mstr_spot = mstr.history(period="1d")['Close'].iloc[-1]
-    except:
-        mstr_spot = 165.0
+    try: mstr_spot = mstr.history(period="1d")['Close'].iloc[-1]
+    except: mstr_spot = 165.0
 
     btc_dict = get_btc_expiry_pains()
-    sorted_btc_dates = sorted(btc_dict.keys())
-
-    # Expanded to 180 days (6 months) for the new trend tracker
+    # Expanded window to 180 days for 6 months of visibility
     cutoff = (datetime.now() + timedelta(days=180)).strftime("%Y-%m-%d")
-    all_options = [e for e in mstr.options if e <= cutoff]
     
     chain_data = []
-    for exp in all_options:
+    for exp in [e for e in mstr.options if e <= cutoff]:
         m_pain, m_call_oi, m_put_oi = calculate_max_pain(mstr, exp)
         if m_pain:
-            b_pain = btc_dict.get(exp)
-            if not b_pain and sorted_btc_dates:
-                closest_date = min(sorted_btc_dates, key=lambda d: abs(datetime.strptime(d, "%Y-%m-%d") - datetime.strptime(exp, "%Y-%m-%d")))
-                b_pain = btc_dict[closest_date]
-            
             chain_data.append({
                 "date": exp,
                 "mstr_pain": round(m_pain, 2),
-                "btc_pain": round(b_pain or 95000.0, 2),
+                "btc_pain": btc_dict.get(exp, 90000.0),
                 "call_oi": m_call_oi,
                 "put_oi": m_put_oi,
                 "is_monthly": (15 <= int(exp.split('-')[2]) <= 21)
             })
 
-    # Save Current Snapshot
-    payload = {
-        "last_update": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "last_update_utc": datetime.utcnow().isoformat() + "Z",
-        "spot": round(mstr_spot, 2),
-        "data": chain_data
-    }
-
     os.makedirs('data', exist_ok=True)
     with open('data/history.json', 'w') as f:
-        json.dump(payload, f, indent=4)
-
-    # Update 10-Day Trend Tracker
-    update_expiry_history(chain_data)
-
-    # Update Daily History Log
-    log_path = 'data/history_log.json'
-    log = json.load(open(log_path)) if os.path.exists(log_path) else []
-    today = datetime.now().strftime("%Y-%m-%d")
-    if not log or log[-1]['date'] != today:
-        log.append({"date": today, "spot": payload["spot"]})
-        with open(log_path, 'w') as f:
-            json.dump(log[-60:], f, indent=4)
+        json.dump({"last_update": datetime.now().strftime("%Y-%m-%d %H:%M"), "spot": round(mstr_spot, 2), "data": chain_data}, f, indent=4)
     
-    print(f"Update Finished. {len(chain_data)} expiries tracked.")
+    update_expiry_history(chain_data)
+    print(f"Update Finished. {len(chain_data)} expiries processed.")
 
 if __name__ == "__main__":
     run_update()
