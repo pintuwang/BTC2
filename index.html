@@ -13,24 +13,22 @@
         #chart-wrapper { height: 500px; margin-top: 20px; }
         .trend-section { margin-top: 60px; padding-top: 30px; border-top: 2px solid #333; }
         .scroll-container { width: 100%; overflow-x: auto; background: #111; border-radius: 8px; margin-top: 15px; }
-        /* Extra wide to accommodate 6 months of historical clusters */
         .trend-chart-inner { width: 8000px; height: 550px; padding: 20px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>📈 MSTR Strategic Monitor</h2>
+        <h2>📈 MSTR Strategic Monitor <span style="font-size: 0.6em; color: #888;">(Singapore Time)</span></h2>
         <div class="controls">
             <label>Target Strike: $</label><input type="number" id="strikeInput" value="150" oninput="updateAnalysis()">
             <div id="last-update" style="font-size: 0.8em; color: #888; margin-left: auto;"></div>
         </div>
         <div id="scoreBox" class="score-box"><h1 id="scoreValue">--</h1><p id="scoreLabel">INITIALIZING...</p></div>
-        
         <div id="chart-wrapper"><canvas id="maxPainChart"></canvas></div>
 
         <div class="trend-section">
             <h3>🕒 Historical Evolution Tracker (SGT)</h3>
-            <p style="font-size: 0.8em; color: #888;">Top Axis: Option Expiry | Bottom Axis: Daily Trade Snapshots. Data will build up over 10 days.</p>
+            <p style="font-size: 0.85em; color: #888;">Top: Expiry Dates | Bottom (Vertical): Daily Trade Points. Bars are <b>Stacked</b> Call/Put Volume.</p>
             <div class="scroll-container">
                 <div class="trend-chart-inner">
                     <canvas id="trendChart"></canvas>
@@ -52,7 +50,7 @@
             renderMainChart();
             renderTrendChart();
             updateAnalysis();
-        } catch (e) { console.log("Awaiting data files..."); }
+        } catch (e) { console.log("Awaiting historical data generation..."); }
     }
 
     function updateAnalysis() {
@@ -62,7 +60,6 @@
         document.getElementById('scoreValue').innerText = `Safety Score: ${score}/10`;
     }
 
-    // TOP CHART: UNCHANGED AS REQUESTED
     function renderMainChart() {
         const ctx = document.getElementById('maxPainChart').getContext('2d');
         new Chart(ctx, {
@@ -79,16 +76,14 @@
         });
     }
 
-    // HISTORICAL CHART: UPDATED FOR STACKING AND EXPRIY HEADERS
     function renderTrendChart() {
         const ctx = document.getElementById('trendChart').getContext('2d');
-        const tradeLabels = [], expiryLabels = [], mstr = [], btc = [], cV = [], pV = [];
+        const tradeLabels = [], expiryHeaders = [], mstr = [], btc = [], cV = [], pV = [];
 
         Object.keys(expiryHistory).sort().forEach(exp => {
             expiryHistory[exp].forEach((d, idx) => {
-                tradeLabels.push(d.trade_date.slice(5)); // Vertical Date (MM-DD)
-                // Map the Expiry Date only to the FIRST point of the cluster
-                expiryLabels.push(idx === 0 ? `EXP: ${exp.slice(5)}` : ''); 
+                tradeLabels.push(d.trade_date.slice(5)); // Vertical bottom label
+                expiryHeaders.push(idx === 0 ? `EXP: ${exp.slice(5)}` : ''); // Header cluster label
                 mstr.push(d.mstr_pain); btc.push(d.btc_pain);
                 cV.push(d.call_oi); pV.push(d.put_oi);
             });
@@ -96,12 +91,12 @@
 
         trendChart = new Chart(ctx, {
             data: {
-                labels: tradeLabels, // Linked to the bottom axis
+                labels: tradeLabels,
                 datasets: [
                     { type: 'line', label: 'MSTR', data: mstr, borderColor: '#00ff88', yAxisID: 'yP', pointRadius: 3 },
-                    { type: 'line', label: 'BTC', data: btc, borderColor: '#3498db', yAxisID: 'yB', borderDash: [2,2], pointRadius: 0 },
-                    { type: 'bar', label: 'Calls', data: cV, backgroundColor: 'rgba(0,255,136,0.2)', yAxisID: 'yV', stack: 'hist' },
-                    { type: 'bar', label: 'Puts', data: pV, backgroundColor: 'rgba(255,68,68,0.2)', yAxisID: 'yV', stack: 'hist' }
+                    { type: 'line', label: 'BTC', data: btc, borderColor: '#3498db', yAxisID: 'yB', borderDash: [3,3], pointRadius: 0 },
+                    { type: 'bar', label: 'Call OI', data: cV, backgroundColor: 'rgba(0,255,136,0.2)', yAxisID: 'yV', stack: 'hist' },
+                    { type: 'bar', label: 'Put OI', data: pV, backgroundColor: 'rgba(255,68,68,0.2)', yAxisID: 'yV', stack: 'hist' }
                 ]
             },
             options: {
@@ -110,12 +105,11 @@
                     x: { ticks: { minRotation: 90, maxRotation: 90, color: '#888' } },
                     xExp: { 
                         position: 'top', 
-                        labels: expiryLabels, // This forces the Expiry Strings to appear
-                        ticks: { color: '#00ff88', font: { weight: 'bold', size: 11 } },
+                        labels: expiryHeaders, // Explicitly provide the Expiry Dates here
+                        ticks: { color: '#00ff88', font: { weight: 'bold' } },
                         grid: { drawOnChartArea: false }
                     },
-                    yP: { position: 'left', title: { display: true, text: 'MSTR' } },
-                    yB: { position: 'right', title: { display: true, text: 'BTC' } },
+                    yP: { position: 'left' }, yB: { position: 'right' },
                     yV: { display: false, stacked: true }
                 }
             }
