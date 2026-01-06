@@ -6,7 +6,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 def calculate_max_pain(ticker_obj, expiry_date):
-    """Calculates Max Pain strike and total Open Interest for columns."""
+    """Calculates Max Pain strike and total Open Interest."""
     try:
         chain = ticker_obj.option_chain(expiry_date)
         total_call_oi = int(chain.calls['openInterest'].sum())
@@ -38,7 +38,7 @@ def get_btc_expiry_pains():
     except: return {}
 
 def update_expiry_history(chain_data):
-    """Maintains a rolling 10-day history for every expiry. Retains past data for 6 months."""
+    """Maintains 10-day snapshots. Retains expired data for historical analysis."""
     path = 'data/expiry_history.json'
     history = json.load(open(path)) if os.path.exists(path) else {}
     today = datetime.now().strftime("%Y-%m-%d")
@@ -46,7 +46,7 @@ def update_expiry_history(chain_data):
     for entry in chain_data:
         exp = entry['date']
         if exp not in history: history[exp] = []
-        # Record only one snapshot per trading day
+        # Add today's snapshot if not already present
         if not history[exp] or history[exp][-1]['trade_date'] != today:
             history[exp].append({
                 "trade_date": today,
@@ -55,9 +55,10 @@ def update_expiry_history(chain_data):
                 "call_oi": entry['call_oi'],
                 "put_oi": entry['put_oi']
             })
-        history[exp] = history[exp][-10:] # Keep last 10 days for each expiry
+        # Maintain 10-day sliding window for active/recent expiries
+        history[exp] = history[exp][-10:]
 
-    # Retain ALL expiries for 180 days (6 months) to allow historical scrolling
+    # Retain all data for 6 months (even if expired) for historical scrolling
     cutoff = (datetime.now() - timedelta(days=180)).strftime("%Y-%m-%d")
     history = {k: v for k, v in history.items() if k >= cutoff}
     with open(path, 'w') as f: json.dump(history, f, indent=4)
@@ -67,7 +68,6 @@ def run_update():
     try: mstr_spot = mstr.history(period="1d")['Close'].iloc[-1]
     except: mstr_spot = 165.0
     btc_dict = get_btc_expiry_pains()
-    # Track next 6 months of expiries
     cutoff = (datetime.now() + timedelta(days=180)).strftime("%Y-%m-%d")
     
     chain_data = []
@@ -83,6 +83,7 @@ def run_update():
     with open('data/history.json', 'w') as f:
         json.dump({"last_update": datetime.now().strftime("%Y-%m-%d %H:%M"), "spot": round(mstr_spot, 2), "data": chain_data}, f, indent=4)
     update_expiry_history(chain_data)
+    print(f"Sync Done. {len(chain_data)} expiries saved.")
 
 if __name__ == "__main__":
     run_update()
