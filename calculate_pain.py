@@ -3,10 +3,12 @@ import json
 import requests
 import yfinance as yf
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+# 1. Setup Singapore Timezone (UTC+8)
+SGT = timezone(timedelta(hours=8))
 
 def calculate_max_pain(ticker_obj, expiry_date):
-    """Calculates Max Pain strike and total Open Interest."""
     try:
         chain = ticker_obj.option_chain(expiry_date)
         total_call_oi = int(chain.calls['openInterest'].sum())
@@ -25,7 +27,6 @@ def calculate_max_pain(ticker_obj, expiry_date):
     except: return None, 0, 0
 
 def get_btc_expiry_pains():
-    """Fetches real BTC Max Pain data from Deribit."""
     try:
         url = "https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option"
         resp = requests.get(url, timeout=15).json().get('result', [])
@@ -38,15 +39,13 @@ def get_btc_expiry_pains():
     except: return {}
 
 def update_expiry_history(chain_data):
-    """Maintains 10-day snapshots. Retains expired data for historical analysis."""
     path = 'data/expiry_history.json'
     history = json.load(open(path)) if os.path.exists(path) else {}
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.now(SGT).strftime("%Y-%m-%d") # SGT Date
     
     for entry in chain_data:
         exp = entry['date']
         if exp not in history: history[exp] = []
-        # Add today's snapshot if not already present
         if not history[exp] or history[exp][-1]['trade_date'] != today:
             history[exp].append({
                 "trade_date": today,
@@ -55,22 +54,21 @@ def update_expiry_history(chain_data):
                 "call_oi": entry['call_oi'],
                 "put_oi": entry['put_oi']
             })
-        # Maintain 10-day sliding window for active/recent expiries
         history[exp] = history[exp][-10:]
 
-    # Retain all data for 6 months (even if expired) for historical scrolling
-    cutoff = (datetime.now() - timedelta(days=180)).strftime("%Y-%m-%d")
+    # Keep 6 months of history (180 days) for historical scrolling
+    cutoff = (datetime.now(SGT) - timedelta(days=180)).strftime("%Y-%m-%d")
     history = {k: v for k, v in history.items() if k >= cutoff}
     with open(path, 'w') as f: json.dump(history, f, indent=4)
 
 def run_update():
     mstr = yf.Ticker("MSTR")
-    try: mstr_spot = mstr.history(period="1d")['Close'].iloc[-1]
-    except: mstr_spot = 165.0
+    mstr_spot = mstr.history(period="1d")['Close'].iloc[-1]
     btc_dict = get_btc_expiry_pains()
-    cutoff = (datetime.now() + timedelta(days=180)).strftime("%Y-%m-%d")
+    cutoff = (datetime.now(SGT) + timedelta(days=180)).strftime("%Y-%m-%d")
     
     chain_data = []
+    # Process ALL options within the next 180 days
     for exp in [e for e in mstr.options if e <= cutoff]:
         m_pain, m_call_oi, m_put_oi = calculate_max_pain(mstr, exp)
         if m_pain:
@@ -81,9 +79,13 @@ def run_update():
 
     os.makedirs('data', exist_ok=True)
     with open('data/history.json', 'w') as f:
-        json.dump({"last_update": datetime.now().strftime("%Y-%m-%d %H:%M"), "spot": round(mstr_spot, 2), "data": chain_data}, f, indent=4)
+        json.dump({
+            "last_update": datetime.now(SGT).strftime("%Y-%m-%d %H:%M"), # SGT Time
+            "spot": round(mstr_spot, 2), 
+            "data": chain_data
+        }, f, indent=4)
     update_expiry_history(chain_data)
-    print(f"Sync Done. {len(chain_data)} expiries saved.")
+    print(f"Sync Complete (SGT). {len(chain_data)} expiries saved.")
 
 if __name__ == "__main__":
     run_update()
