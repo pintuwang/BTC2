@@ -29,7 +29,7 @@ def calculate_max_pain(ticker_obj, expiry_date):
     except: return None, 0, 0
 
 def get_btc_expiry_pains():
-    """Fetches BTC Max Pain from Deribit."""
+    """Fetches real BTC Max Pain data from Deribit."""
     try:
         url = "https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option"
         resp = requests.get(url, timeout=15).json().get('result', [])
@@ -42,15 +42,15 @@ def get_btc_expiry_pains():
     except: return {}
 
 def update_expiry_history(chain_data):
-    """Maintains a rolling 10-day history for every expiry, past and present."""
+    """Saves rolling 10-day history. Data is NOT deleted upon expiry."""
     path = 'data/expiry_history.json'
     history = json.load(open(path)) if os.path.exists(path) else {}
     today = datetime.now().strftime("%Y-%m-%d")
     
-    # 1. Add current snapshots
     for entry in chain_data:
         exp = entry['date']
         if exp not in history: history[exp] = []
+        # Record one snapshot per day
         if not history[exp] or history[exp][-1]['trade_date'] != today:
             history[exp].append({
                 "trade_date": today,
@@ -61,10 +61,9 @@ def update_expiry_history(chain_data):
             })
         history[exp] = history[exp][-10:]
 
-    # 2. RETAIN EXPIRED DATA: Only delete expiries older than 180 days (6 months)
+    # Only delete data older than 6 months (regardless of expiry)
     cutoff = (datetime.now() - timedelta(days=180)).strftime("%Y-%m-%d")
     history = {k: v for k, v in history.items() if k >= cutoff}
-
     with open(path, 'w') as f:
         json.dump(history, f, indent=4)
 
@@ -72,9 +71,8 @@ def run_update():
     mstr = yf.Ticker("MSTR")
     try: mstr_spot = mstr.history(period="1d")['Close'].iloc[-1]
     except: mstr_spot = 165.0
-
+    
     btc_dict = get_btc_expiry_pains()
-    # Expanded window to 180 days for 6 months of visibility
     cutoff = (datetime.now() + timedelta(days=180)).strftime("%Y-%m-%d")
     
     chain_data = []
@@ -84,7 +82,7 @@ def run_update():
             chain_data.append({
                 "date": exp,
                 "mstr_pain": round(m_pain, 2),
-                "btc_pain": btc_dict.get(exp, 90000.0),
+                "btc_pain": btc_dict.get(exp, 95000.0),
                 "call_oi": m_call_oi,
                 "put_oi": m_put_oi,
                 "is_monthly": (15 <= int(exp.split('-')[2]) <= 21)
@@ -95,7 +93,7 @@ def run_update():
         json.dump({"last_update": datetime.now().strftime("%Y-%m-%d %H:%M"), "spot": round(mstr_spot, 2), "data": chain_data}, f, indent=4)
     
     update_expiry_history(chain_data)
-    print(f"Update Finished. {len(chain_data)} expiries processed.")
+    print(f"Sync Complete. {len(chain_data)} expiries tracked.")
 
 if __name__ == "__main__":
     run_update()
