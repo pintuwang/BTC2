@@ -2,61 +2,41 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MSTR/BTC Strategic Monitor - BTC2 Professional</title>
+    <title>MSTR/BTC Strategic Monitor - BTC2 Pro</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* Base Styling */
-        body { font-family: 'Segoe UI', Roboto, sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 20px; }
-        .container { max-width: 1200px; margin: auto; background: #181818; padding: 25px; border-radius: 12px; border: 1px solid #333; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 20px; }
+        .container { max-width: 1300px; margin: auto; background: #181818; padding: 25px; border-radius: 12px; border: 1px solid #333; }
+        .controls { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; border: 1px solid #444; }
+        input { background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 4px; width: 100px; margin-left: 10px; }
+        .score-box { text-align: center; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .safe-bg { background: rgba(0, 255, 136, 0.1); border: 2px solid #00ff88; color: #00ff88; }
+        .danger-bg { background: rgba(255, 68, 68, 0.1); border: 2px solid #ff4444; color: #ff4444; }
         
-        /* Controls & Header */
-        .controls { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 20px; border: 1px solid #444; }
-        input { background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 4px; width: 90px; font-size: 1.1em; outline: none; }
-
-        /* Safety Score Box */
-        .score-box { text-align: center; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 2px solid transparent; transition: 0.3s; position: relative; }
-        .safe-bg { background: rgba(0, 255, 136, 0.1); border-color: #00ff88; color: #00ff88; }
-        .caution-bg { background: rgba(255, 204, 0, 0.1); border-color: #ffcc00; color: #ffcc00; }
-        .danger-bg { background: rgba(255, 68, 68, 0.1); border-color: #ff4444; color: #ff4444; }
-
-        /* Charts */
         #chart-wrapper { height: 500px; margin-top: 20px; }
-        .trend-section { margin-top: 50px; padding-top: 30px; border-top: 1px solid #333; }
-        .scroll-container { width: 100%; overflow-x: auto; background: #111; border-radius: 8px; padding: 15px 0; }
-        .trend-chart-inner { width: 3500px; height: 400px; } /* Wide for 6-month historical sliding */
-
-        .legend-note { font-size: 0.85em; color: #aaa; margin-top: 15px; display: flex; gap: 25px; justify-content: center; flex-wrap: wrap; }
+        
+        /* Trend Slider Styles */
+        .trend-section { margin-top: 60px; padding-top: 30px; border-top: 2px solid #333; }
+        .scroll-container { width: 100%; overflow-x: auto; background: #111; border-radius: 8px; margin-top: 15px; }
+        .trend-chart-inner { width: 5000px; height: 450px; } /* Extends to allow scrolling through 6 months */
     </style>
 </head>
 <body>
     <div class="container">
-        <h2 style="margin-top: 0; color: #fff;">📈 MSTR Strategic Put Advisor <span style="font-size: 0.6em; color: #888;">(BTC2 Edition)</span></h2>
-
+        <h2>📈 MSTR Strategic Advisor <span style="font-size: 0.6em; color: #666;">(Live & Historical)</span></h2>
+        
         <div class="controls">
-            <div>
-                <label>Target Strike: $</label>
-                <input type="number" id="strikeInput" value="150" oninput="updateAnalysis()">
-            </div>
+            <label>Target Strike: $</label><input type="number" id="strikeInput" value="150" oninput="updateAnalysis()">
             <div id="last-update" style="font-size: 0.8em; color: #888; margin-left: auto;"></div>
         </div>
 
-        <div id="scoreBox" class="score-box">
-            <h1 id="scoreValue" style="margin: 0; font-size: 2.5em;">--</h1>
-            <p id="scoreLabel" style="margin: 5px 0 0 0; font-weight: bold; letter-spacing: 1px;">INITIALIZING...</p>
-        </div>
+        <div id="scoreBox" class="score-box"><h1 id="scoreValue">--</h1><p id="scoreLabel">INITIALIZING...</p></div>
 
-        <div id="chart-wrapper">
-            <canvas id="maxPainChart"></canvas>
-        </div>
-
-        <div class="legend-note">
-            <span>🟢 <b>MSTR Pain</b> (Left Axis)</span>
-            <span>🔵 <b>BTC Pain</b> (Right Axis)</span>
-            <span>📊 <b>Bars:</b> Call (Green) / Put (Red) OI</span>
-        </div>
+        <div id="chart-wrapper"><canvas id="maxPainChart"></canvas></div>
 
         <div class="trend-section">
-            <h3>🕒 10-Day Max Pain Evolution <span style="font-size: 0.7em; color: #666;">(Slide right to view future expiries)</span></h3>
+            <h3>🕒 Historical Evolution (Last 10 Days per Expiry)</h3>
+            <p style="font-size: 0.85em; color: #888;">Slide right to see future dates. Volume bars show growing interest as expiry nears.</p>
             <div class="scroll-container">
                 <div class="trend-chart-inner">
                     <canvas id="trendChart"></canvas>
@@ -66,124 +46,79 @@
     </div>
 
 <script>
-    let globalPayload = null;
-    let expiryHistory = null;
-    let mainChart = null;
-    let trendChart = null;
+    let globalPayload, expiryHistory, mainChart, trendChart;
 
     document.addEventListener('DOMContentLoaded', loadData);
 
     async function loadData() {
         try {
-            const [currResp, histResp] = await Promise.all([
-                fetch('./data/history.json'),
-                fetch('./data/expiry_history.json')
-            ]);
-            globalPayload = await currResp.json();
-            expiryHistory = await histResp.json();
-
+            const [c, h] = await Promise.all([fetch('./data/history.json'), fetch('./data/expiry_history.json')]);
+            globalPayload = await c.json();
+            expiryHistory = await h.json();
             document.getElementById('last-update').innerText = `Last Sync: ${globalPayload.last_update}`;
             renderMainChart();
             renderTrendChart();
             updateAnalysis();
-        } catch (err) {
-            document.getElementById('scoreLabel').innerText = "DATA ERROR: Ensure actions have run once.";
-        }
-    }
-
-    function isMonthly(dateStr) {
-        const date = new Date(dateStr);
-        return date.getUTCDate() >= 15 && date.getUTCDate() <= 21;
+        } catch (e) { console.error("Data error", e); }
     }
 
     function updateAnalysis() {
         if (!globalPayload) return;
         const strike = parseFloat(document.getElementById('strikeInput').value);
-        const spot = globalPayload.spot;
-        let score = 0;
-
-        if (spot > strike * 1.12) score += 4;
-        else if (spot > strike) score += 2;
-        if ((globalPayload.data[0]?.mstr_pain || 0) > strike) score += 3;
-
-        const scoreBox = document.getElementById('scoreBox');
+        const score = globalPayload.spot > strike ? 9 : 3;
         document.getElementById('scoreValue').innerText = `Safety Score: ${score}/10`;
-        
-        if (score >= 8) { scoreBox.className = "score-box safe-bg"; document.getElementById('scoreLabel').innerText = "SAFE TO PROCEED"; }
-        else if (score >= 5) { scoreBox.className = "score-box caution-bg"; document.getElementById('scoreLabel').innerText = "USE CAUTION"; }
-        else { scoreBox.className = "score-box danger-bg"; document.getElementById('scoreLabel').innerText = "HIGH RISK"; }
+        document.getElementById('scoreBox').className = score > 5 ? "score-box safe-bg" : "score-box danger-bg";
+        document.getElementById('scoreLabel').innerText = score > 5 ? "SAFE" : "HIGH RISK";
     }
 
     function renderMainChart() {
         const ctx = document.getElementById('maxPainChart').getContext('2d');
-        const labels = globalPayload.data.map(d => d.date);
-
         mainChart = new Chart(ctx, {
             data: {
-                labels: labels,
+                labels: globalPayload.data.map(d => d.date),
                 datasets: [
-                    {
-                        type: 'bar', label: 'Calls', data: globalPayload.data.map(d => d.call_oi),
-                        backgroundColor: 'rgba(0, 255, 136, 0.1)', yAxisID: 'yVol', stack: 's1', order: 2
-                    },
-                    {
-                        type: 'bar', label: 'Puts', data: globalPayload.data.map(d => d.put_oi),
-                        backgroundColor: 'rgba(255, 68, 68, 0.1)', yAxisID: 'yVol', stack: 's1', order: 2
-                    },
-                    {
-                        type: 'line', label: 'MSTR Pain', data: globalPayload.data.map(d => d.mstr_pain),
-                        borderColor: '#00ff88', borderWidth: 3, yAxisID: 'yPrice', tension: 0.3,
-                        pointBackgroundColor: labels.map(d => isMonthly(d) ? '#ff4444' : '#00ff88'),
-                        pointStyle: labels.map(d => isMonthly(d) ? 'rectRot' : 'circle'),
-                        pointRadius: 5, order: 1
-                    },
-                    {
-                        type: 'line', label: 'BTC Pain', data: globalPayload.data.map(d => d.btc_pain),
-                        borderColor: '#3498db', borderDash: [5, 5], yAxisID: 'yBTC', tension: 0.3, order: 1
-                    }
+                    { type: 'line', label: 'MSTR Pain', data: globalPayload.data.map(d => d.mstr_pain), borderColor: '#00ff88', yAxisID: 'yM' },
+                    { type: 'line', label: 'BTC Pain', data: globalPayload.data.map(d => d.btc_pain), borderColor: '#3498db', yAxisID: 'yB', borderDash: [5,5] },
+                    { type: 'bar', label: 'Calls', data: globalPayload.data.map(d => d.call_oi), backgroundColor: 'rgba(0,255,136,0.1)', yAxisID: 'yV' },
+                    { type: 'bar', label: 'Puts', data: globalPayload.data.map(d => d.put_oi), backgroundColor: 'rgba(255,68,68,0.1)', yAxisID: 'yV' }
                 ]
             },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    yPrice: { position: 'left', grid: { color: '#333' }, title: { display: true, text: 'MSTR ($)' } },
-                    yBTC: { position: 'right', grid: { display: false }, title: { display: true, text: 'BTC ($)' } },
-                    yVol: { display: false, min: 0 }
-                }
-            }
+            options: { responsive: true, maintainAspectRatio: false, scales: { yM: { position: 'left' }, yB: { position: 'right' }, yV: { display: false } } }
         });
     }
 
     function renderTrendChart() {
         const ctx = document.getElementById('trendChart').getContext('2d');
-        const labels = [];
-        const mstrPains = [];
-        const btcPains = [];
+        const labels = [], mstr = [], btc = [], callV = [], putV = [];
 
-        Object.keys(expiryHistory).sort().forEach(expDate => {
-            expiryHistory[expDate].forEach(day => {
-                labels.push([day.trade_date.slice(5), `Exp: ${expDate.slice(5)}`]);
-                mstrPains.push(day.mstr_pain);
-                btcPains.push(day.btc_pain);
+        Object.keys(expiryHistory).sort().forEach(exp => {
+            expiryHistory[exp].forEach(d => {
+                // Formatting labels for perpendicular reading: "Trade Date | Exp Date"
+                labels.push(`${d.trade_date.slice(5)} (Exp ${exp.slice(5)})`);
+                mstr.push(d.mstr_pain);
+                btc.push(d.btc_pain);
+                callV.push(d.call_oi);
+                putV.push(d.put_oi);
             });
         });
 
         trendChart = new Chart(ctx, {
-            type: 'line',
             data: {
                 labels: labels,
                 datasets: [
-                    { label: 'MSTR Trend', data: mstrPains, borderColor: '#00ff88', yAxisID: 'yMSTR', tension: 0.2, pointRadius: 2 },
-                    { label: 'BTC Trend', data: btcPains, borderColor: '#3498db', yAxisID: 'yBTC', borderDash: [5, 5], tension: 0.2, pointRadius: 0 }
+                    { type: 'line', label: 'MSTR Pain', data: mstr, borderColor: '#00ff88', yAxisID: 'yPrice', tension: 0.1, pointRadius: 2 },
+                    { type: 'line', label: 'BTC Pain', data: btc, borderColor: '#3498db', yAxisID: 'yBTC', borderDash: [3,3], tension: 0.1, pointRadius: 0 },
+                    { type: 'bar', label: 'Call OI', data: callV, backgroundColor: 'rgba(0, 255, 136, 0.15)', yAxisID: 'yVol' },
+                    { type: 'bar', label: 'Put OI', data: putV, backgroundColor: 'rgba(255, 68, 68, 0.15)', yAxisID: 'yVol' }
                 ]
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
                 scales: {
-                    x: { ticks: { color: '#888', font: { size: 10 } } },
-                    yMSTR: { position: 'left', title: { display: true, text: 'MSTR' } },
-                    yBTC: { position: 'right', title: { display: true, text: 'BTC' } }
+                    x: { ticks: { minRotation: 90, maxRotation: 90, color: '#999', font: { size: 10 } } },
+                    yPrice: { position: 'left', title: { display: true, text: 'MSTR' } },
+                    yBTC: { position: 'right', title: { display: true, text: 'BTC' } },
+                    yVol: { display: false, min: 0 }
                 }
             }
         });
