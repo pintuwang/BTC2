@@ -2,18 +2,19 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MSTR/BTC Strategic Monitor - Professional BTC2</title>
+    <title>MSTR/BTC Strategic Monitor - Professional Edition</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 20px; }
         .container { max-width: 1400px; margin: auto; background: #181818; padding: 25px; border-radius: 12px; border: 1px solid #333; }
         .controls { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; border: 1px solid #444; }
         input { background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 4px; width: 100px; margin-left: 10px; }
-        .score-box { text-align: center; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .score-box { text-align: center; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 2px solid transparent; }
         #chart-wrapper { height: 500px; margin-top: 20px; }
         .trend-section { margin-top: 60px; padding-top: 30px; border-top: 2px solid #333; }
         .scroll-container { width: 100%; overflow-x: auto; background: #111; border-radius: 8px; margin-top: 15px; }
-        .trend-chart-inner { width: 6000px; height: 500px; padding: 20px; }
+        /* Extra wide to accommodate 6 months of historical clusters */
+        .trend-chart-inner { width: 8000px; height: 550px; padding: 20px; }
     </style>
 </head>
 <body>
@@ -24,10 +25,12 @@
             <div id="last-update" style="font-size: 0.8em; color: #888; margin-left: auto;"></div>
         </div>
         <div id="scoreBox" class="score-box"><h1 id="scoreValue">--</h1><p id="scoreLabel">INITIALIZING...</p></div>
+        
         <div id="chart-wrapper"><canvas id="maxPainChart"></canvas></div>
 
         <div class="trend-section">
-            <h3>🕒 Historical Evolution Tracker</h3>
+            <h3>🕒 Historical Evolution Tracker (SGT)</h3>
+            <p style="font-size: 0.8em; color: #888;">Top Axis: Option Expiry | Bottom Axis: Daily Trade Snapshots. Data will build up over 10 days.</p>
             <div class="scroll-container">
                 <div class="trend-chart-inner">
                     <canvas id="trendChart"></canvas>
@@ -45,11 +48,11 @@
             const [c, h] = await Promise.all([fetch('./data/history.json'), fetch('./data/expiry_history.json')]);
             globalPayload = await c.json();
             expiryHistory = await h.json();
-            document.getElementById('last-update').innerText = `Last Sync: ${globalPayload.last_update}`;
+            document.getElementById('last-update').innerText = `Last Sync (Singapore): ${globalPayload.last_update}`;
             renderMainChart();
             renderTrendChart();
             updateAnalysis();
-        } catch (e) { console.log("Awaiting historical file generation..."); }
+        } catch (e) { console.log("Awaiting data files..."); }
     }
 
     function updateAnalysis() {
@@ -59,6 +62,7 @@
         document.getElementById('scoreValue').innerText = `Safety Score: ${score}/10`;
     }
 
+    // TOP CHART: UNCHANGED AS REQUESTED
     function renderMainChart() {
         const ctx = document.getElementById('maxPainChart').getContext('2d');
         new Chart(ctx, {
@@ -67,22 +71,24 @@
                 datasets: [
                     { type: 'line', label: 'MSTR Pain', data: globalPayload.data.map(d => d.mstr_pain), borderColor: '#00ff88', yAxisID: 'yP' },
                     { type: 'line', label: 'BTC Pain', data: globalPayload.data.map(d => d.btc_pain), borderColor: '#3498db', yAxisID: 'yB', borderDash: [5,5] },
-                    { type: 'bar', label: 'Calls', data: globalPayload.data.map(d => d.call_oi), backgroundColor: 'rgba(0,255,136,0.15)', yAxisID: 'yV', stack: 'vol' },
-                    { type: 'bar', label: 'Puts', data: globalPayload.data.map(d => d.put_oi), backgroundColor: 'rgba(255,68,68,0.15)', yAxisID: 'yV', stack: 'vol' }
+                    { type: 'bar', label: 'Calls', data: globalPayload.data.map(d => d.call_oi), backgroundColor: 'rgba(0,255,136,0.15)', yAxisID: 'yV', stack: 'v1' },
+                    { type: 'bar', label: 'Puts', data: globalPayload.data.map(d => d.put_oi), backgroundColor: 'rgba(255,68,68,0.15)', yAxisID: 'yV', stack: 'v1' }
                 ]
             },
             options: { responsive: true, maintainAspectRatio: false, scales: { yP: { position: 'left' }, yB: { position: 'right' }, yV: { display: false, stacked: true } } }
         });
     }
 
+    // HISTORICAL CHART: UPDATED FOR STACKING AND EXPRIY HEADERS
     function renderTrendChart() {
         const ctx = document.getElementById('trendChart').getContext('2d');
-        const tradeLabels = [], topLabels = [], mstr = [], btc = [], cV = [], pV = [];
+        const tradeLabels = [], expiryLabels = [], mstr = [], btc = [], cV = [], pV = [];
 
         Object.keys(expiryHistory).sort().forEach(exp => {
             expiryHistory[exp].forEach((d, idx) => {
-                tradeLabels.push(d.trade_date.slice(5)); // Vertical Date
-                topLabels.push(idx === 0 ? `EXP: ${exp.slice(5)}` : ''); // Header Date
+                tradeLabels.push(d.trade_date.slice(5)); // Vertical Date (MM-DD)
+                // Map the Expiry Date only to the FIRST point of the cluster
+                expiryLabels.push(idx === 0 ? `EXP: ${exp.slice(5)}` : ''); 
                 mstr.push(d.mstr_pain); btc.push(d.btc_pain);
                 cV.push(d.call_oi); pV.push(d.put_oi);
             });
@@ -90,12 +96,12 @@
 
         trendChart = new Chart(ctx, {
             data: {
-                labels: tradeLabels, // Linked to bottom axis
+                labels: tradeLabels, // Linked to the bottom axis
                 datasets: [
-                    { type: 'line', label: 'MSTR', data: mstr, borderColor: '#00ff88', yAxisID: 'yP' },
-                    { type: 'line', label: 'BTC', data: btc, borderColor: '#3498db', yAxisID: 'yB', borderDash: [2,2] },
-                    { type: 'bar', label: 'Calls', data: cV, backgroundColor: 'rgba(0,255,136,0.2)', yAxisID: 'yV', stack: 'v' },
-                    { type: 'bar', label: 'Puts', data: pV, backgroundColor: 'rgba(255,68,68,0.2)', yAxisID: 'yV', stack: 'v' }
+                    { type: 'line', label: 'MSTR', data: mstr, borderColor: '#00ff88', yAxisID: 'yP', pointRadius: 3 },
+                    { type: 'line', label: 'BTC', data: btc, borderColor: '#3498db', yAxisID: 'yB', borderDash: [2,2], pointRadius: 0 },
+                    { type: 'bar', label: 'Calls', data: cV, backgroundColor: 'rgba(0,255,136,0.2)', yAxisID: 'yV', stack: 'hist' },
+                    { type: 'bar', label: 'Puts', data: pV, backgroundColor: 'rgba(255,68,68,0.2)', yAxisID: 'yV', stack: 'hist' }
                 ]
             },
             options: {
@@ -104,12 +110,13 @@
                     x: { ticks: { minRotation: 90, maxRotation: 90, color: '#888' } },
                     xExp: { 
                         position: 'top', 
-                        labels: topLabels, // Explicitly provide the "EXP" strings here
-                        ticks: { color: '#00ff88', font: { weight: 'bold' } },
+                        labels: expiryLabels, // This forces the Expiry Strings to appear
+                        ticks: { color: '#00ff88', font: { weight: 'bold', size: 11 } },
                         grid: { drawOnChartArea: false }
                     },
-                    yP: { position: 'left' }, yB: { position: 'right' },
-                    yV: { display: false, stacked: true } // Crucial for stacking
+                    yP: { position: 'left', title: { display: true, text: 'MSTR' } },
+                    yB: { position: 'right', title: { display: true, text: 'BTC' } },
+                    yV: { display: false, stacked: true }
                 }
             }
         });
