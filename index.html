@@ -2,209 +2,147 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MSTR/BTC Strategic Monitor - Professional Edition</title>
+    <title>MSTR/BTC Strategic Monitor - BTC2 Trend Edition</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* Base Styling */
-        body { font-family: 'Segoe UI', Roboto, sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 20px; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 20px; }
         .container { max-width: 1200px; margin: auto; background: #181818; padding: 25px; border-radius: 12px; border: 1px solid #333; }
-        
-        /* Controls & Last Update */
         .controls { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 20px; border: 1px solid #444; }
-        input { background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 4px; width: 90px; font-size: 1.1em; outline: none; }
-        input:focus { border-color: #00ff88; }
-
-        /* Market Phase Tooltip */
-        .phase-container { position: relative; display: inline-block; cursor: help; }
-        .phase-tag { font-size: 0.9em; padding: 6px 12px; border-radius: 4px; background: #333; border: 1px solid #555; font-weight: bold; }
-        .phase-tooltip { 
-            visibility: hidden; width: 240px; background-color: #2c2c2c; color: #fff; text-align: left;
-            border-radius: 6px; padding: 12px; position: absolute; z-index: 10; bottom: 125%; left: 50%;
-            transform: translateX(-50%); opacity: 0; transition: opacity 0.3s; font-size: 0.85em; line-height: 1.4; border: 1px solid #666; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-        }
-        .phase-container:hover .phase-tooltip { visibility: visible; opacity: 1; }
-
-        /* Trend Indicator Styles */
-        .trend-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.8em; font-weight: bold; margin-left: 10px; }
-        .trend-up { background: rgba(0, 255, 136, 0.2); color: #00ff88; border: 1px solid #00ff88; }
-        .trend-down { background: rgba(255, 68, 68, 0.2); color: #ff4444; border: 1px solid #ff4444; }
-        .trend-flat { background: rgba(136, 136, 136, 0.2); color: #888; border: 1px solid #888; }
-
-        /* Safety Score Box */
-        .score-box { text-align: center; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 2px solid transparent; transition: 0.3s; position: relative; }
+        input { background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 4px; width: 90px; }
+        
+        .score-box { text-align: center; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 2px solid transparent; position: relative; }
         .safe-bg { background: rgba(0, 255, 136, 0.1); border-color: #00ff88; color: #00ff88; }
         .caution-bg { background: rgba(255, 204, 0, 0.1); border-color: #ffcc00; color: #ffcc00; }
         .danger-bg { background: rgba(255, 68, 68, 0.1); border-color: #ff4444; color: #ff4444; }
 
-        /* Chart & Legend */
-        #chart-wrapper { height: 550px; margin-top: 20px; }
-        .legend-note { font-size: 0.85em; color: #aaa; margin-top: 15px; display: flex; gap: 25px; justify-content: center; flex-wrap: wrap; }
-        .red-dot { color: #ff4444; font-weight: bold; }
+        #chart-wrapper { height: 450px; margin-top: 20px; }
+        
+        /* New Scrollable Trend Chart Styling */
+        .trend-section { margin-top: 40px; padding-top: 20px; border-top: 1px solid #333; }
+        .scroll-container { width: 100%; overflow-x: auto; white-space: nowrap; margin-top: 15px; background: #111; border-radius: 8px; padding-bottom: 10px; }
+        .trend-chart-inner { width: 3000px; height: 400px; } /* Large width to enable sliding */
+        
+        .trend-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.8em; font-weight: bold; }
+        .trend-up { background: rgba(0, 255, 136, 0.2); color: #00ff88; }
+        .trend-down { background: rgba(255, 68, 68, 0.2); color: #ff4444; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2 style="margin-top: 0; color: #fff;">📈 MSTR Strategic Put Advisor <span style="font-size: 0.6em; color: #888;">(Price & Volume)</span></h2>
+        <h2>📈 MSTR Strategic Monitor</h2>
 
         <div class="controls">
-            <div>
-                <label>Target Strike: $</label>
-                <input type="number" id="strikeInput" value="150" oninput="updateAnalysis()">
-            </div>
-            
-            <div class="phase-container">
-                <div id="phaseDisplay" class="phase-tag">Detecting Phase...</div>
-                <div class="phase-tooltip">
-                    <b>Provisional (Mon/Tue):</b> Data is still building. Use for planning only.<br><br>
-                    <b>Sweet Spot (Wed):</b> 🟢 <b>Highest Accuracy.</b> Most OI is locked in.<br><br>
-                    <b>Reactive (Thu/Fri):</b> Max gravitational force toward the magnet.
-                </div>
-            </div>
-
+            <div><label>Target Strike: $</label><input type="number" id="strikeInput" value="150" oninput="updateAnalysis()"></div>
             <div id="last-update" style="font-size: 0.8em; color: #888; margin-left: auto;"></div>
         </div>
 
         <div id="scoreBox" class="score-box">
             <div id="trendDisplay" style="position: absolute; top: 15px; right: 20px;"></div>
             <h1 id="scoreValue" style="margin: 0; font-size: 2.5em;">--</h1>
-            <p id="scoreLabel" style="margin: 5px 0 0 0; font-weight: bold; letter-spacing: 1px;">INITIALIZING...</p>
+            <p id="scoreLabel" style="margin: 5px 0 0 0; font-weight: bold;">INITIALIZING...</p>
         </div>
 
-        <div id="chart-wrapper">
-            <canvas id="maxPainChart"></canvas>
-        </div>
+        <div id="chart-wrapper"><canvas id="maxPainChart"></canvas></div>
 
-        <div class="legend-note">
-            <span>🟢 <b>MSTR Max Pain</b> (Price Magnet)</span>
-            <span>🔵 <b>BTC Max Pain</b> (Trend Guide)</span>
-            <span>📊 <b>Bars:</b> Call (Green) / Put (Red) Open Interest</span>
-            <span><span class="red-dot">◆ Red Diamond:</span> Monthly Expiry</span>
+        <div class="trend-section">
+            <h3>🕒 10-Day Max Pain Evolution (Slide to view future expiries)</h3>
+            <div class="scroll-container">
+                <div class="trend-chart-inner">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
         </div>
     </div>
 
 <script>
     let globalPayload = null;
-    let globalLog = [];
-    let myChart = null;
+    let expiryHistory = null;
+    let mainChart = null;
+    let trendChart = null;
 
     document.addEventListener('DOMContentLoaded', loadData);
 
     async function loadData() {
         try {
-            // Load current data
-            const response = await fetch('./data/history.json');
-            const rawData = await response.json();
+            const [currResp, histResp] = await Promise.all([
+                fetch('./data/history.json'),
+                fetch('./data/expiry_history.json')
+            ]);
             
-            // Load historical log for trend analysis
-            try {
-                const logResponse = await fetch('./data/history_log.json');
-                globalLog = await logResponse.json();
-            } catch (e) { console.log("Log not found yet."); }
-
-            const spot = rawData.spot;
-            globalPayload = {
-                ...rawData,
-                data: rawData.data.filter(d => d.mstr_pain > (spot * 0.3) && d.mstr_pain < (spot * 5))
-            };
+            globalPayload = await currResp.json();
+            expiryHistory = await histResp.json();
 
             document.getElementById('last-update').innerText = `Last Sync: ${globalPayload.last_update}`;
-            renderChart();
+            renderMainChart();
+            renderTrendChart();
             updateAnalysis();
-        } catch (err) {
-            document.getElementById('scoreLabel').innerText = "DATA MISSING: Check history.json";
-        }
-    }
-
-    function isMonthly(dateStr) {
-        const date = new Date(dateStr);
-        const day = date.getUTCDate();
-        return day >= 15 && day <= 21;
-    }
-
-    function getMarketPhase() {
-        const day = new Date().getDay(); 
-        const phases = { 1: "Provisional", 2: "Provisional", 3: "Sweet Spot", 4: "Reactive", 5: "Reactive" };
-        const colors = { 1: "#3498db", 2: "#3498db", 3: "#00ff88", 4: "#ffcc00", 5: "#ffcc00" };
-        return { name: phases[day] || "Weekend", color: colors[day] || "#888" };
+        } catch (err) { console.log("Data Load Error:", err); }
     }
 
     function updateAnalysis() {
         if (!globalPayload) return;
         const strike = parseFloat(document.getElementById('strikeInput').value);
         const spot = globalPayload.spot;
-        const phase = getMarketPhase();
-        const weeklyPain = globalPayload.data[0]?.mstr_pain || 0;
-        
-        // --- Trend Logic ---
-        const trendBox = document.getElementById('trendDisplay');
-        if (globalLog.length > 1) {
-            const yesterdaySpot = globalLog[globalLog.length - 2].spot;
-            const diff = spot - yesterdaySpot;
-            const pct = ((diff / yesterdaySpot) * 100).toFixed(1);
-            
-            if (diff > 0.5) trendBox.innerHTML = `<span class="trend-badge trend-up">▲ Spot +${pct}%</span>`;
-            else if (diff < -0.5) trendBox.innerHTML = `<span class="trend-badge trend-down">▼ Spot ${pct}%</span>`;
-            else trendBox.innerHTML = `<span class="trend-badge trend-flat">↔ Flat</span>`;
-        }
-
-        // --- Score Logic ---
         let score = 0;
+
         if (spot > strike * 1.12) score += 4;
         else if (spot > strike) score += 2;
-        if (weeklyPain > strike) score += 3;
-        
-        const monthlyItem = globalPayload.data.find(d => isMonthly(d.date));
-        if (monthlyItem && monthlyItem.mstr_pain > strike) score += 3;
+        if ((globalPayload.data[0]?.mstr_pain || 0) > strike) score += 3;
 
         const scoreBox = document.getElementById('scoreBox');
         document.getElementById('scoreValue').innerText = `Safety Score: ${score}/10`;
-        document.getElementById('phaseDisplay').innerText = `Phase: ${phase.name}`;
-        document.getElementById('phaseDisplay').style.borderColor = phase.color;
         
         if (score >= 8) { scoreBox.className = "score-box safe-bg"; document.getElementById('scoreLabel').innerText = "SAFE TO PROCEED"; }
         else if (score >= 5) { scoreBox.className = "score-box caution-bg"; document.getElementById('scoreLabel').innerText = "USE CAUTION"; }
         else { scoreBox.className = "score-box danger-bg"; document.getElementById('scoreLabel').innerText = "HIGH RISK"; }
-        
-        if(myChart) myChart.update();
     }
 
-    function renderChart() {
+    function renderMainChart() {
         const ctx = document.getElementById('maxPainChart').getContext('2d');
-        const labels = globalPayload.data.map(d => d.date);
+        mainChart = new Chart(ctx, {
+            data: {
+                labels: globalPayload.data.map(d => d.date),
+                datasets: [
+                    { type: 'line', label: 'MSTR Pain', data: globalPayload.data.map(d => d.mstr_pain), borderColor: '#00ff88', tension: 0.3 },
+                    { type: 'bar', label: 'OI Calls', data: globalPayload.data.map(d => d.call_oi), backgroundColor: 'rgba(0, 255, 136, 0.1)' }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
 
-        myChart = new Chart(ctx, {
+    function renderTrendChart() {
+        const ctx = document.getElementById('trendChart').getContext('2d');
+        const labels = [];
+        const mstrPains = [];
+        const btcPains = [];
+
+        // Flatten history for the nested X-axis
+        Object.keys(expiryHistory).sort().forEach(expDate => {
+            expiryHistory[expDate].forEach(day => {
+                // Nested label: [Trade Date, Expiry Date]
+                labels.push([day.trade_date.slice(5), `Exp: ${expDate.slice(5)}`]);
+                mstrPains.push(day.mstr_pain);
+                btcPains.push(day.btc_pain);
+            });
+        });
+
+        trendChart = new Chart(ctx, {
+            type: 'line',
             data: {
                 labels: labels,
                 datasets: [
-                    {
-                        type: 'bar', label: 'Calls', data: globalPayload.data.map(d => d.call_oi),
-                        backgroundColor: 'rgba(0, 255, 136, 0.1)', yAxisID: 'yVol', stack: 's1', order: 2
-                    },
-                    {
-                        type: 'bar', label: 'Puts', data: globalPayload.data.map(d => d.put_oi),
-                        backgroundColor: 'rgba(255, 68, 68, 0.1)', yAxisID: 'yVol', stack: 's1', order: 2
-                    },
-                    {
-                        type: 'line', label: 'MSTR Pain', data: globalPayload.data.map(d => d.mstr_pain),
-                        borderColor: '#00ff88', borderWidth: 3, yAxisID: 'yPrice', tension: 0.3,
-                        pointBackgroundColor: labels.map(d => isMonthly(d) ? '#ff4444' : '#00ff88'),
-                        pointRadius: labels.map(d => isMonthly(d) ? 7 : 4),
-                        pointStyle: labels.map(d => isMonthly(d) ? 'rectRot' : 'circle'),
-                        order: 1
-                    },
-                    {
-                        type: 'line', label: 'BTC Pain', data: globalPayload.data.map(d => d.btc_pain),
-                        borderColor: '#3498db', borderDash: [5, 5], yAxisID: 'yBTC', tension: 0.3, order: 1
-                    }
+                    { label: 'MSTR Max Pain Trend', data: mstrPains, borderColor: '#00ff88', yAxisID: 'yMSTR', tension: 0.2, pointRadius: 2 },
+                    { label: 'BTC Max Pain Trend', data: btcPains, borderColor: '#3498db', yAxisID: 'yBTC', borderDash: [5, 5], tension: 0.2, pointRadius: 0 }
                 ]
             },
             options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
+                responsive: true,
+                maintainAspectRatio: false,
                 scales: {
-                    yPrice: { position: 'left', grid: { color: '#333' }, title: { display: true, text: 'MSTR ($)' } },
-                    yBTC: { position: 'right', grid: { display: false }, title: { display: true, text: 'BTC ($)' } },
-                    yVol: { display: false }
+                    x: { ticks: { color: '#888', font: { size: 10 } } },
+                    yMSTR: { position: 'left', title: { display: true, text: 'MSTR' } },
+                    yBTC: { position: 'right', title: { display: true, text: 'BTC' } }
                 }
             }
         });
