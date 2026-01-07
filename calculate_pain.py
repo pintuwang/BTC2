@@ -5,7 +5,7 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 
-# Setup Singapore Timezone (UTC+8)
+# --- Singapore Timezone Configuration ---
 SGT = timezone(timedelta(hours=8))
 
 def calculate_max_pain(ticker_obj, expiry_date):
@@ -45,40 +45,50 @@ def get_btc_expiry_pains():
     except: return {}
 
 def update_expiry_history(chain_data):
-    """Saves rolling 10-day history. Data is retained for 6 months after expiry."""
+    """Maintains a rolling 10-day history for every expiry. Retains past data for 6 months."""
     path = 'data/expiry_history.json'
     history = json.load(open(path)) if os.path.exists(path) else {}
-    today = datetime.now(SGT).strftime("%Y-%m-%d")
+    today_sgt = datetime.now(SGT).strftime("%Y-%m-%d")
     
+    # 1. Update existing and new expiries with today's snapshot
     for entry in chain_data:
         exp = entry['date']
         if exp not in history: history[exp] = []
-        if not history[exp] or history[exp][-1]['trade_date'] != today:
+        
+        # Only record one entry per day
+        if not history[exp] or history[exp][-1]['trade_date'] != today_sgt:
             history[exp].append({
-                "trade_date": today,
+                "trade_date": today_sgt,
                 "mstr_pain": entry['mstr_pain'],
                 "btc_pain": entry['btc_pain'],
                 "call_oi": entry['call_oi'],
                 "put_oi": entry['put_oi']
             })
+        # Keep only the latest 10 trading days for the window
         history[exp] = history[exp][-10:]
 
-    # Retain all historical data for 180 days (6 months)
+    # 2. DATA RETENTION: Only delete clusters older than 180 days (6 months)
     cutoff = (datetime.now(SGT) - timedelta(days=180)).strftime("%Y-%m-%d")
     history = {k: v for k, v in history.items() if k >= cutoff}
-    with open(path, 'w') as f: json.dump(history, f, indent=4)
+    
+    with open(path, 'w') as f:
+        json.dump(history, f, indent=4)
 
 def run_update():
     mstr = yf.Ticker("MSTR")
-    try: mstr_spot = mstr.history(period="1d")['Close'].iloc[-1]
-    except: mstr_spot = 165.0
-    
+    try:
+        mstr_spot = mstr.history(period="1d")['Close'].iloc[-1]
+    except:
+        mstr_spot = 165.0
+
     btc_dict = get_btc_expiry_pains()
+    
+    # Track next 180 days (6 months) of expiries
     cutoff = (datetime.now(SGT) + timedelta(days=180)).strftime("%Y-%m-%d")
+    all_options = [e for e in mstr.options if e <= cutoff]
     
     chain_data = []
-    # Track all available options for the next 6 months
-    for exp in [e for e in mstr.options if e <= cutoff]:
+    for exp in all_options:
         m_pain, m_call_oi, m_put_oi = calculate_max_pain(mstr, exp)
         if m_pain:
             chain_data.append({
@@ -91,15 +101,29 @@ def run_update():
             })
 
     os.makedirs('data', exist_ok=True)
-    with open('data/history.json', 'w') as f:
-        json.dump({
-            "last_update": datetime.now(SGT).strftime("%Y-%m-%d %H:%M"),
-            "spot": round(mstr_spot, 2),
-            "data": chain_data
-        }, f, indent=4)
     
+    # Current Snapshot for Top Chart
+    payload = {
+        "last_update": datetime.now(SGT).strftime("%Y-%m-%d %H:%M"),
+        "spot": round(mstr_spot, 2),
+        "data": chain_data
+    }
+    with open('data/history.json', 'w') as f:
+        json.dump(payload, f, indent=4)
+
+    # Update the Historical Evolution Database
     update_expiry_history(chain_data)
-    print(f"Sync Complete (Singapore Time). {len(chain_data)} expiries tracked.")
+    
+    # Standard Log (Unchanged)
+    log_path = 'data/history_log.json'
+    log = json.load(open(log_path)) if os.path.exists(log_path) else []
+    today = datetime.now(SGT).strftime("%Y-%m-%d")
+    if not log or log[-1]['date'] != today:
+        log.append({"date": today, "spot": payload["spot"]})
+        with open(log_path, 'w') as f:
+            json.dump(log[-60:], f, indent=4)
+    
+    print(f"Update Finished (SGT). {len(chain_data)} expiries tracked.")
 
 if __name__ == "__main__":
     run_update()
