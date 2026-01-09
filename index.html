@@ -143,7 +143,9 @@
             // Find the final max pain record for that expiry on the actual expiry day
             const finalPainEntry = expiryHistory[expiryDate].find(h => h.trade_date === expiryDate);
 
-            if (logEntry && finalPainEntry) {
+
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (logEntry && finalPainEntry && expiryDate < todayStr) {
                 labels.push(expiryDate);
                 actualSpot.push(logEntry.spot);
                 painTarget.push(finalPainEntry.mstr_pain);
