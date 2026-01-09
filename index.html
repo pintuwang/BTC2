@@ -34,7 +34,7 @@
 
         <div class="trend-section">
             <h3>🕒 Historical Evolution Tracker (Singapore Time)</h3>
-            <p style="font-size: 0.85em; color: #888;">Grouped by Option Expiry (Top) | Daily Snapshots (Bottom Vertical).</p>
+            <p style="font-size: 0.85em; color: #888;">Grouped by Option Expiry (Horizontal Spans) | Daily Snapshots (Perpendicular).</p>
             <div class="scroll-container">
                 <div class="trend-chart-inner">
                     <canvas id="trendChart"></canvas>
@@ -90,7 +90,7 @@
             options: { 
                 responsive: true, maintainAspectRatio: false, 
                 scales: { 
-                    yP: { position: 'left', title: { display: true, text: 'MSTR ($)', color: '#00ff88' } }, 
+                    yP: { position: 'left', beginAtZero: false, grace: '10%', title: { display: true, text: 'MSTR ($)', color: '#00ff88' } }, 
                     yB: { position: 'right', title: { display: true, text: 'BTC ($)', color: '#3498db' }, grid: { display: false } }, 
                     yV: { display: false, stacked: true } 
                 } 
@@ -102,15 +102,15 @@
         const ctx = document.getElementById('trendChart').getContext('2d');
         if (trendChart) trendChart.destroy();
 
-        const nestedLabels = []; // THIS WILL HOLD THE [DAILY, EXPIRY] NESTED DATA
+        const nestedLabels = []; 
         const mstr = [], btc = [], cV = [], pV = [];
 
+        // Build dual-axis data from expiryHistory
         Object.keys(expiryHistory).sort().forEach(exp => {
-            expiryHistory[exp].forEach((d, idx) => {
-                // NESTED LOGIC: [Bottom Label, Top Label]
-                // Only show Expiry Label for the FIRST point of each group to create the grouping effect
-                const topLabel = (idx === 0) ? `Option: ${exp.slice(5)}` : '';
-                nestedLabels.push([d.trade_date.slice(5), topLabel]);
+            expiryHistory[exp].forEach((d) => {
+                // NESTED AXIS LOGIC: [Inner Label, Outer Label]
+                // Inner = Trade Date (perpendicular), Outer = Expiry Group (horizontal spanning)
+                nestedLabels.push([d.trade_date.slice(5), "EXP: " + exp.slice(5)]);
                 
                 mstr.push(d.mstr_pain);
                 btc.push(d.btc_pain);
@@ -137,22 +137,19 @@
                             minRotation: 90, 
                             maxRotation: 90, 
                             color: '#888', 
-                            font: { size: 10 } 
-                        }
-                    },
-                    // SECONDARY AXIS FOR THE HEADERS
-                    x2: {
-                        position: 'top',
-                        grid: { display: false },
-                        ticks: {
-                            color: '#00ff88',
-                            font: { weight: 'bold', size: 12 },
+                            font: { size: 10 },
                             autoSkip: false
+                        },
+                        grid: {
+                            color: 'rgba(255,255,255,0.05)'
                         }
                     },
                     yP: { position: 'left', title: { display: true, text: 'MSTR' } },
                     yB: { position: 'right', title: { display: true, text: 'BTC' } },
                     yV: { display: false, stacked: true }
+                },
+                plugins: {
+                    legend: { labels: { color: 'white' } }
                 }
             }
         });
