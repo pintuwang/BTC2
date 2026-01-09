@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MSTR/BTC Strategic Monitor - Professional BTC2 Fixed</title>
+    <title>MSTR/BTC Strategic Monitor - Professional BTC2 Final</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 20px; }
@@ -33,8 +33,8 @@
         <div id="chart-wrapper"><canvas id="maxPainChart"></canvas></div>
 
         <div class="trend-section">
-            <h3>🕒 Historical Evolution Tracker (SGT)</h3>
-            <p style="font-size: 0.85em; color: #888;">Top Axis: Option Expiry | Bottom Axis: Daily Trade Snapshots.</p>
+            <h3>🕒 Historical Evolution Tracker (Singapore Time)</h3>
+            <p style="font-size: 0.85em; color: #888;">Grouped by Option Expiry (Top) | Daily Snapshots (Bottom Vertical).</p>
             <div class="scroll-container">
                 <div class="trend-chart-inner">
                     <canvas id="trendChart"></canvas>
@@ -54,30 +54,10 @@
                 fetch('./data/expiry_history.json')
             ]);
             
-            const rawPayload = await c.json();
+            globalPayload = await c.json();
             expiryHistory = await h.json();
 
-            // 1. RESTORE JAN 9 (Ensures it shows even if missing from history.json)
-            if (expiryHistory["2026-01-09"] && !rawPayload.data.some(d => d.date === "2026-01-09")) {
-                const jan9Data = expiryHistory["2026-01-09"];
-                const latestJan9 = jan9Data[jan9Data.length - 1];
-                rawPayload.data.unshift({
-                    date: "2026-01-09",
-                    mstr_pain: latestJan9.mstr_pain,
-                    btc_pain: latestJan9.btc_pain,
-                    call_oi: latestJan9.call_oi,
-                    put_oi: latestJan9.put_oi
-                });
-            }
-
-            // 2. PROFESSIONAL FILTER (Relaxed to 0.3x-5.0x to show more dates)
-            const spot = rawPayload.spot;
-            globalPayload = {
-                ...rawPayload,
-                data: rawPayload.data.filter(d => d.mstr_pain > (spot * 0.3) && d.mstr_pain < (spot * 5))
-            };
-
-            document.getElementById('last-update').innerText = `Last Sync (Singapore): ${globalPayload.last_update}`;
+            document.getElementById('last-update').innerText = `Last Sync (SGT): ${globalPayload.last_update}`;
             renderMainChart();
             renderTrendChart();
             updateAnalysis();
@@ -110,7 +90,7 @@
             options: { 
                 responsive: true, maintainAspectRatio: false, 
                 scales: { 
-                    yP: { position: 'left', beginAtZero: false, grace: '15%', title: { display: true, text: 'MSTR ($)', color: '#00ff88' } }, 
+                    yP: { position: 'left', title: { display: true, text: 'MSTR ($)', color: '#00ff88' } }, 
                     yB: { position: 'right', title: { display: true, text: 'BTC ($)', color: '#3498db' }, grid: { display: false } }, 
                     yV: { display: false, stacked: true } 
                 } 
@@ -122,13 +102,16 @@
         const ctx = document.getElementById('trendChart').getContext('2d');
         if (trendChart) trendChart.destroy();
 
-        const tradeLabels = [], topLabels = [], mstr = [], btc = [], cV = [], pV = [];
+        const nestedLabels = []; // THIS WILL HOLD THE [DAILY, EXPIRY] NESTED DATA
+        const mstr = [], btc = [], cV = [], pV = [];
 
-        // Build dual-axis data from expiryHistory (Same logic as original BTC2)
         Object.keys(expiryHistory).sort().forEach(exp => {
             expiryHistory[exp].forEach((d, idx) => {
-                tradeLabels.push(d.trade_date.slice(5)); 
-                topLabels.push(idx === 0 ? `EXP: ${exp.slice(5)}` : ''); 
+                // NESTED LOGIC: [Bottom Label, Top Label]
+                // Only show Expiry Label for the FIRST point of each group to create the grouping effect
+                const topLabel = (idx === 0) ? `Option: ${exp.slice(5)}` : '';
+                nestedLabels.push([d.trade_date.slice(5), topLabel]);
+                
                 mstr.push(d.mstr_pain);
                 btc.push(d.btc_pain);
                 cV.push(d.call_oi);
@@ -138,7 +121,7 @@
 
         trendChart = new Chart(ctx, {
             data: {
-                labels: tradeLabels,
+                labels: nestedLabels,
                 datasets: [
                     { type: 'line', label: 'MSTR', data: mstr, borderColor: '#00ff88', yAxisID: 'yP', pointRadius: 3 },
                     { type: 'line', label: 'BTC', data: btc, borderColor: '#3498db', yAxisID: 'yB', borderDash: [2,2], pointRadius: 0 },
@@ -149,12 +132,23 @@
             options: {
                 responsive: true, maintainAspectRatio: false,
                 scales: {
-                    x: { ticks: { minRotation: 90, maxRotation: 90, color: '#888', font: { size: 10 } } },
-                    xExp: { 
-                        position: 'top', 
-                        labels: topLabels, 
-                        ticks: { color: '#00ff88', font: { weight: 'bold', size: 12 } },
-                        grid: { drawOnChartArea: false }
+                    x: {
+                        ticks: { 
+                            minRotation: 90, 
+                            maxRotation: 90, 
+                            color: '#888', 
+                            font: { size: 10 } 
+                        }
+                    },
+                    // SECONDARY AXIS FOR THE HEADERS
+                    x2: {
+                        position: 'top',
+                        grid: { display: false },
+                        ticks: {
+                            color: '#00ff88',
+                            font: { weight: 'bold', size: 12 },
+                            autoSkip: false
+                        }
                     },
                     yP: { position: 'left', title: { display: true, text: 'MSTR' } },
                     yB: { position: 'right', title: { display: true, text: 'BTC' } },
