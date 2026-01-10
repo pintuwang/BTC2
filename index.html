@@ -36,7 +36,7 @@
 
         <div class="section-header">
             <h3>🕒 Historical Evolution Tracker (SGT)</h3>
-            <p style="font-size: 0.85em; color: #888;">Evolution of Max Pain leading up to each expiry. Each cluster is one specific option date.</p>
+            <p style="font-size: 0.85em; color: #888;">Evolution of Max Pain leading up to each expiry.</p>
             <div class="scroll-container">
                 <div class="trend-chart-inner">
                     <canvas id="trendChart"></canvas>
@@ -46,7 +46,7 @@
 
         <div class="section-header">
             <h3>🎯 Expiry Accuracy: Actual Close vs Max Pain</h3>
-            <p style="font-size: 0.85em; color: #888;">Matches MSTR Actual Price vs the "Institutional Magnet" for that specific Friday close.</p>
+            <p style="font-size: 0.85em; color: #888;">Actual MSTR Close (Yellow Star) vs the Friday close "Institutional Magnet."</p>
             <div class="accuracy-container">
                 <canvas id="accuracyChart"></canvas>
             </div>
@@ -136,14 +136,11 @@
 
         const labels = [], actualSpot = [], painTarget = [], btcTarget = [], callOI = [], putOI = [];
 
-        // Logic: Cross-reference expiryHistory with historyLog to find closed expiries
         Object.keys(expiryHistory).sort().forEach(expiryDate => {
-            // Find if we have a spot price record for this exact expiry date
             const logEntry = historyLog.find(l => l.date === expiryDate);
-            // Find the final max pain record for that expiry on the actual expiry day
             const finalPainEntry = expiryHistory[expiryDate].find(h => h.trade_date === expiryDate);
 
-
+            // Condition to only show data for expiries that have passed (using SGT day after)
             const todayStr = new Date().toISOString().split('T')[0];
             if (logEntry && finalPainEntry && expiryDate < todayStr) {
                 labels.push(expiryDate);
@@ -159,11 +156,22 @@
             data: {
                 labels: labels,
                 datasets: [
-                    { type: 'bar', label: 'Actual Close', data: actualSpot, backgroundColor: 'rgba(255, 255, 255, 0.4)', borderColor: '#fff', borderWidth: 1, yAxisID: 'yP', order: 2 },
-                    { type: 'line', label: 'Max Pain Target', data: painTarget, borderColor: '#00ff88', borderWidth: 3, pointRadius: 5, yAxisID: 'yP', order: 1, tension: 0 },
-                    { type: 'line', label: 'BTC Pain Target', data: btcTarget, borderColor: '#3498db', borderDash: [5,5], yAxisID: 'yB', order: 1 },
-                    { type: 'bar', label: 'Total Calls', data: callOI, backgroundColor: 'rgba(0, 255, 136, 0.1)', yAxisID: 'yV', stack: 'oi', order: 3 },
-                    { type: 'bar', label: 'Total Puts', data: putOI, backgroundColor: 'rgba(255, 68, 68, 0.1)', yAxisID: 'yV', stack: 'oi', order: 3 }
+                    { 
+                        type: 'line', 
+                        label: 'Actual MSTR Close', 
+                        data: actualSpot, 
+                        borderColor: '#ffff00', 
+                        backgroundColor: '#ffff00',
+                        showLine: false,           // Star overlay only, no line
+                        pointStyle: 'star',        
+                        pointRadius: 12,           
+                        yAxisID: 'yP', 
+                        order: 0                   
+                    },
+                    { type: 'line', label: 'MSTR Max Pain', data: painTarget, borderColor: '#00ff88', borderWidth: 3, pointRadius: 5, yAxisID: 'yP', order: 1, tension: 0 },
+                    { type: 'line', label: 'BTC Max Pain', data: btcTarget, borderColor: '#3498db', borderDash: [5,5], yAxisID: 'yB', order: 1 },
+                    { type: 'bar', label: 'Total Calls', data: callOI, backgroundColor: 'rgba(0, 255, 136, 0.1)', yAxisID: 'yV', stack: 'oi', order: 2 },
+                    { type: 'bar', label: 'Total Puts', data: putOI, backgroundColor: 'rgba(255, 68, 68, 0.1)', yAxisID: 'yV', stack: 'oi', order: 2 }
                 ]
             },
             options: {
@@ -174,7 +182,7 @@
                     yB: { position: 'right', title: { display: true, text: 'BTC Price ($)', color: '#3498db' }, grid: { display: false } },
                     yV: { display: false, stacked: true }
                 },
-                plugins: { legend: { labels: { color: 'white' } } }
+                plugins: { legend: { labels: { color: 'white', usePointStyle: true } } }
             }
         });
     }
