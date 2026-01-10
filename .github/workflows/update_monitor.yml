@@ -2,16 +2,16 @@ name: Market Monitor Sync
 
 on:
   schedule:
-    - cron: '0 13 * * 1-5' # Runs daily at 1PM UTC (Mon-Fri)
+    - cron: '0 13 * * 1-5' # Intra-day update (1PM UTC / 9PM SGT)
+    - cron: '0 22 * * 1-5' # Post-market close update (10PM UTC / 6AM SGT)
   workflow_dispatch:      # Allows manual refresh
 
-# This stops two runs from fighting each other if you trigger it manually
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
-  contents: write         # CRITICAL: Allows saving your JSON history
+  contents: write         # Allows saving JSON history
 
 jobs:
   build:
@@ -35,10 +35,8 @@ jobs:
           git config --local user.email "actions@github.com"
           git config --local user.name "github-actions[bot]"
           git add .
-          # Commits only if there are changes; otherwise, it skips
           git commit -m "Update Market Data [skip ci]" || echo "No changes to commit"
           
-          # This pull logic 'forces' your script's new data to win if a conflict occurs
           git fetch origin main
           git pull --rebase -X theirs origin main
           git push origin main
