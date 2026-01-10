@@ -50,12 +50,10 @@ def update_expiry_history(chain_data):
     history = json.load(open(path)) if os.path.exists(path) else {}
     today_sgt = datetime.now(SGT).strftime("%Y-%m-%d")
     
-    # 1. Update existing and new expiries with today's snapshot
     for entry in chain_data:
         exp = entry['date']
         if exp not in history: history[exp] = []
         
-        # Only record one entry per day
         if not history[exp] or history[exp][-1]['trade_date'] != today_sgt:
             history[exp].append({
                 "trade_date": today_sgt,
@@ -64,10 +62,8 @@ def update_expiry_history(chain_data):
                 "call_oi": entry['call_oi'],
                 "put_oi": entry['put_oi']
             })
-        # Keep only the latest 10 trading days for the window
         history[exp] = history[exp][-10:]
 
-    # 2. DATA RETENTION: Only delete clusters older than 180 days (6 months)
     cutoff = (datetime.now(SGT) - timedelta(days=180)).strftime("%Y-%m-%d")
     history = {k: v for k, v in history.items() if k >= cutoff}
     
@@ -82,8 +78,6 @@ def run_update():
         mstr_spot = 165.0
 
     btc_dict = get_btc_expiry_pains()
-    
-    # Track next 180 days (6 months) of expiries
     cutoff = (datetime.now(SGT) + timedelta(days=180)).strftime("%Y-%m-%d")
     all_options = [e for e in mstr.options if e <= cutoff]
     
@@ -102,7 +96,6 @@ def run_update():
 
     os.makedirs('data', exist_ok=True)
     
-    # Current Snapshot for Top Chart
     payload = {
         "last_update": datetime.now(SGT).strftime("%Y-%m-%d %H:%M"),
         "spot": round(mstr_spot, 2),
@@ -111,17 +104,20 @@ def run_update():
     with open('data/history.json', 'w') as f:
         json.dump(payload, f, indent=4)
 
-    # Update the Historical Evolution Database
     update_expiry_history(chain_data)
     
-    # Standard Log (Unchanged)
+    # --- FIXED LOGGING LOGIC: Overwrite same-day spot price for accuracy ---
     log_path = 'data/history_log.json'
     log = json.load(open(log_path)) if os.path.exists(log_path) else []
     today = datetime.now(SGT).strftime("%Y-%m-%d")
-    if not log or log[-1]['date'] != today:
-        log.append({"date": today, "spot": payload["spot"]})
-        with open(log_path, 'w') as f:
-            json.dump(log[-60:], f, indent=4)
+    
+    if log and log[-1]['date'] == today:
+        log[-1]['spot'] = payload["spot"] # Update existing intra-day entry
+    else:
+        log.append({"date": today, "spot": payload["spot"]}) # Add new entry
+    
+    with open(log_path, 'w') as f:
+        json.dump(log[-60:], f, indent=4)
     
     print(f"Update Finished (SGT). {len(chain_data)} expiries tracked.")
 
