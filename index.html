@@ -40,7 +40,7 @@
 
         <div class="section-header">
             <h3>🕒 Historical Evolution Tracker (SGT)</h3>
-            <p style="font-size: 0.85em; color: #888;">Evolution of Max Pain leading up to each expiry. Each cluster is one specific option date.</p>
+            <p style="font-size: 0.85em; color: #888;">Evolution of Max Pain leading up to each expiry. Each cluster is separated by vertical lines.</p>
             <div class="scroll-container">
                 <div class="trend-chart-inner">
                     <canvas id="trendChart"></canvas>
@@ -108,12 +108,19 @@
         });
     }
 
-    // --- CHART 2: EVOLUTION TRACKER (UNTOUCHED) ---
+    // --- CHART 2: EVOLUTION TRACKER (REFINED WITH BOUNDARY LINES) ---
     function renderTrendChart() {
         const ctx = document.getElementById('trendChart').getContext('2d');
         if (trendChart) trendChart.destroy();
+        
         const nestedLabels = [], mstr = [], btc = [], cV = [], pV = [];
-        Object.keys(expiryHistory).sort().forEach(exp => {
+        const boundaries = []; // Tracks where to draw vertical lines
+
+        const sortedExpiries = Object.keys(expiryHistory).sort();
+        sortedExpiries.forEach((exp, groupIdx) => {
+            // If not the first group, mark the start of a new expiry section
+            if (groupIdx > 0) boundaries.push(nestedLabels.length);
+
             expiryHistory[exp].forEach((d) => {
                 nestedLabels.push([d.trade_date.slice(5), "EXP: " + exp.slice(5)]);
                 mstr.push(d.mstr_pain);
@@ -122,7 +129,30 @@
                 pV.push(d.put_oi);
             });
         });
+
+        // Custom Plugin to draw vertical separators between expiry groups
+        const verticalLinePlugin = {
+            id: 'verticalLinePlugin',
+            beforeDraw: (chart) => {
+                const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
+                ctx.save();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; // Thin white line
+                ctx.lineWidth = 1;
+                
+                boundaries.forEach(index => {
+                    // Draw line exactly between the two differing expiry clusters
+                    const xPos = (x.getPixelForIndex(index) + x.getPixelForIndex(index - 1)) / 2;
+                    ctx.beginPath();
+                    ctx.moveTo(xPos, top);
+                    ctx.lineTo(xPos, bottom);
+                    ctx.stroke();
+                });
+                ctx.restore();
+            }
+        };
+
         trendChart = new Chart(ctx, {
+            plugins: [verticalLinePlugin],
             data: {
                 labels: nestedLabels,
                 datasets: [
@@ -132,11 +162,20 @@
                     { type: 'bar', label: 'Puts', data: pV, backgroundColor: 'rgba(255, 68, 68, 0.1)', yAxisID: 'yV', stack: 'h' }
                 ]
             },
-            options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { font: { size: 9 }, autoSkip: false } }, yP: { position: 'left' }, yB: { position: 'right' }, yV: { display: false, stacked: true } } }
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                scales: { 
+                    x: { ticks: { font: { size: 9 }, autoSkip: false } }, 
+                    yP: { position: 'left' }, 
+                    yB: { position: 'right' }, 
+                    yV: { display: false, stacked: true } 
+                } 
+            }
         });
     }
 
-    // --- CHART 3: ACCURACY TRACKER (REFINED WITH STAR OVERLAY) ---
+    // --- CHART 3: ACCURACY TRACKER (UNTOUCHED) ---
     function renderAccuracyChart() {
         const ctx = document.getElementById('accuracyChart').getContext('2d');
         if (accuracyChart) accuracyChart.destroy();
@@ -147,20 +186,15 @@
             const cluster = expiryHistory[expiryDate];
             if (!cluster || cluster.length === 0) return;
 
-            // 1. Get final Max Pain target from the last calculation in the cluster
             const finalPainEntry = cluster[cluster.length - 1];
-
-            // 2. Cross-reference Log for Actual Close. 
-            // Post-market run logs Friday close on Saturday SGT, so we check day-of and day-after
             const nextDayDate = new Date(new Date(expiryDate).getTime() + 86400000);
             const nextDayStr = nextDayDate.toISOString().split('T')[0];
             const logEntry = historyLog.find(l => l.date === nextDayStr) || historyLog.find(l => l.date === expiryDate);
 
-            // 3. Strict display logic: only show finalized data
             const todayStr = new Date().toISOString().split('T')[0];
             if (logEntry && finalPainEntry && expiryDate < todayStr) {
                 labels.push(expiryDate);
-                actualSpot.push(logEntry.spot); // This will correctly pull $157.33 from the Jan 10 log
+                actualSpot.push(logEntry.spot);
                 painTarget.push(finalPainEntry.mstr_pain);
                 btcTarget.push(finalPainEntry.btc_pain);
                 callOI.push(finalPainEntry.call_oi);
@@ -179,7 +213,7 @@
                         borderColor: '#ffff00', 
                         backgroundColor: '#ffff00',
                         showLine: false,           
-                        pointStyle: 'star',        // Yellow star overlay
+                        pointStyle: 'star',        
                         pointRadius: 12,           
                         yAxisID: 'yP', 
                         order: 0                   
