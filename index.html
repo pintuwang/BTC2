@@ -12,6 +12,7 @@
         .score-box { text-align: center; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 2px solid transparent; }
         .safe-bg { background: rgba(0, 255, 136, 0.1); border-color: #00ff88; color: #00ff88; }
         .danger-bg { background: rgba(255, 68, 68, 0.1); border-color: #ff4444; color: #ff4444; }
+        
         #chart-wrapper { height: 500px; margin-top: 20px; }
         .section-header { margin-top: 60px; padding-top: 30px; border-top: 2px solid #333; }
         .scroll-container { width: 100%; overflow-x: auto; background: #111; border-radius: 8px; margin-top: 15px; }
@@ -32,7 +33,7 @@
 
         <div class="section-header">
             <h3>🕒 Historical Evolution Tracker (SGT)</h3>
-            <p style="font-size: 0.85em; color: #888;">Daily snapshots of Max Pain. Thin white lines separate option expiry groups.</p>
+            <p style="font-size: 0.85em; color: #888;">Daily snapshots of Max Pain. White lines separate option expiry groups.</p>
             <div class="scroll-container">
                 <div class="trend-chart-inner"><canvas id="trendChart"></canvas></div>
             </div>
@@ -40,7 +41,7 @@
 
         <div class="section-header">
             <h3>🎯 Expiry Accuracy: Actual Close vs Max Pain</h3>
-            <p style="font-size: 0.85em; color: #888;">Matches actual MSTR closing price (Yellow Star) against the final "Institutional Magnet".</p>
+            <p style="font-size: 0.85em; color: #888;">Actual MSTR Close (Yellow Star) vs the Friday close "Institutional Magnet".</p>
             <div class="accuracy-container"><canvas id="accuracyChart"></canvas></div>
         </div>
     </div>
@@ -60,7 +61,7 @@
             expiryHistory = await h.json();
             historyLog = await l.json();
 
-            // PROFESSIONAL FILTER: Prevents glitched outliers (like $510) from squashing the scale
+            // PROFESSIONAL FILTER: Prevents glitched points (like $510) from squashing the scale
             const spot = raw.spot;
             globalPayload = {
                 ...raw,
@@ -101,7 +102,7 @@
                 scales: { 
                     yP: { position: 'left', beginAtZero: false, grace: '10%', title: { display: true, text: 'MSTR ($)', color: '#00ff88' } }, 
                     yB: { position: 'right', title: { display: true, text: 'BTC ($)', color: '#3498db' }, grid: { display: false } }, 
-                    // FIXED: position 'right' + display false prevents merging with MSTR Price axis
+                    // FIXED: Isolated yV on the right prevents price stunting
                     yV: { display: false, position: 'right', beginAtZero: true, max: 2000000 } 
                 } 
             }
@@ -116,7 +117,7 @@
         const expiries = Object.keys(expiryHistory).sort();
 
         expiries.forEach((exp, idx) => {
-            if (idx > 0) bounds.push(labels.length); // Record index where a new group starts
+            if (idx > 0) bounds.push(labels.length); 
             expiryHistory[exp].forEach(d => {
                 labels.push([d.trade_date.slice(5), "EXP: " + exp.slice(5)]);
                 mstr.push(d.mstr_pain); btc.push(d.btc_pain);
@@ -124,13 +125,14 @@
             });
         });
 
-        // FIXED: Boundary Line Plugin ensures separation between clusters
+        // SAFE Plugin implementation
         const linePlugin = {
             id: 'linePlugin',
-            beforeDraw: (chart) => {
+            afterDraw: (chart) => {
+                if (!chart.scales.x) return;
                 const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
                 ctx.save();
-                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                ctx.strokeStyle = 'rgba(255,255,255,0.4)';
                 ctx.lineWidth = 1;
                 bounds.forEach(b => {
                     const xPos = (x.getPixelForIndex(b) + x.getPixelForIndex(b - 1)) / 2;
@@ -173,7 +175,6 @@
             if (!cluster || cluster.length === 0) return;
             const finalPain = cluster[cluster.length - 1];
 
-            // FIXED: Cross-reference logic matches US Friday close recorded on Sat SGT
             const nextDay = new Date(new Date(expDate).getTime() + 86400000).toISOString().split('T')[0];
             const logEntry = historyLog.find(l => l.date === nextDay) || historyLog.find(l => l.date === expDate);
 
