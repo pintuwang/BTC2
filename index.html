@@ -32,7 +32,7 @@
 
         <div class="section-header">
             <h3>🕒 Historical Evolution Tracker (SGT)</h3>
-            <p style="font-size: 0.85em; color: #888;">Daily snapshots of Max Pain. White lines separate option expiry groups.</p>
+            <p style="font-size: 0.85em; color: #888;">Daily snapshots of Max Pain. Thin white lines separate option expiry groups.</p>
             <div class="scroll-container">
                 <div class="trend-chart-inner"><canvas id="trendChart"></canvas></div>
             </div>
@@ -40,7 +40,7 @@
 
         <div class="section-header">
             <h3>🎯 Expiry Accuracy: Actual Close vs Max Pain</h3>
-            <p style="font-size: 0.85em; color: #888;">Matches actual MSTR closing price (Yellow Star) against the "Institutional Magnet".</p>
+            <p style="font-size: 0.85em; color: #888;">Matches actual MSTR closing price (Yellow Star) against the final "Institutional Magnet".</p>
             <div class="accuracy-container"><canvas id="accuracyChart"></canvas></div>
         </div>
     </div>
@@ -60,7 +60,7 @@
             expiryHistory = await h.json();
             historyLog = await l.json();
 
-            // PROFESSIONAL FILTER: Prevents $510 glitched points from squashing the scale
+            // PROFESSIONAL FILTER: Prevents glitched outliers (like $510) from squashing the scale
             const spot = raw.spot;
             globalPayload = {
                 ...raw,
@@ -101,8 +101,8 @@
                 scales: { 
                     yP: { position: 'left', beginAtZero: false, grace: '10%', title: { display: true, text: 'MSTR ($)', color: '#00ff88' } }, 
                     yB: { position: 'right', title: { display: true, text: 'BTC ($)', color: '#3498db' }, grid: { display: false } }, 
-                    // FIXED: Isolated Volume scale prevents price stunting
-                    yV: { display: false, position: 'left', beginAtZero: true, max: 2000000 } 
+                    // FIXED: position 'right' + display false prevents merging with MSTR Price axis
+                    yV: { display: false, position: 'right', beginAtZero: true, max: 2000000 } 
                 } 
             }
         });
@@ -116,21 +116,21 @@
         const expiries = Object.keys(expiryHistory).sort();
 
         expiries.forEach((exp, idx) => {
-            if (idx > 0) bounds.push(labels.length); // Mark boundary index
+            if (idx > 0) bounds.push(labels.length); // Record index where a new group starts
             expiryHistory[exp].forEach(d => {
-                labels.push([d.trade_date.slice(5), exp.slice(5)]);
+                labels.push([d.trade_date.slice(5), "EXP: " + exp.slice(5)]);
                 mstr.push(d.mstr_pain); btc.push(d.btc_pain);
                 cV.push(d.call_oi); pV.push(d.put_oi);
             });
         });
 
-        // FIXED: Safe implementation of vertical lines
+        // FIXED: Boundary Line Plugin ensures separation between clusters
         const linePlugin = {
             id: 'linePlugin',
-            afterDraw: (chart) => {
+            beforeDraw: (chart) => {
                 const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
                 ctx.save();
-                ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
                 ctx.lineWidth = 1;
                 bounds.forEach(b => {
                     const xPos = (x.getPixelForIndex(b) + x.getPixelForIndex(b - 1)) / 2;
@@ -156,7 +156,8 @@
                 scales: { 
                     x: { ticks: { autoSkip: false, font: { size: 9 } } },
                     yP: { position: 'left', beginAtZero: false, grace: '5%' }, 
-                    yB: { position: 'right' }, yV: { display: false, stacked: true } 
+                    yB: { position: 'right' }, 
+                    yV: { display: false, position: 'right', stacked: true } 
                 } 
             }
         });
@@ -171,7 +172,8 @@
             const cluster = expiryHistory[expDate];
             if (!cluster || cluster.length === 0) return;
             const finalPain = cluster[cluster.length - 1];
-            // Cross-reference logs for Friday close (recorded Saturday SGT)
+
+            // FIXED: Cross-reference logic matches US Friday close recorded on Sat SGT
             const nextDay = new Date(new Date(expDate).getTime() + 86400000).toISOString().split('T')[0];
             const logEntry = historyLog.find(l => l.date === nextDay) || historyLog.find(l => l.date === expDate);
 
@@ -189,8 +191,8 @@
                     { type: 'line', label: 'Actual Close', data: spots, borderColor: '#ffff00', backgroundColor: '#ffff00', showLine: false, pointStyle: 'star', pointRadius: 12, yAxisID: 'yP', order: 0 },
                     { type: 'line', label: 'MSTR Pain', data: pain, borderColor: '#00ff88', borderWidth: 3, pointRadius: 5, yAxisID: 'yP', order: 1 },
                     { type: 'line', label: 'BTC Pain', data: btc, borderColor: '#3498db', borderDash: [5,5], yAxisID: 'yB', order: 1 },
-                    { type: 'bar', label: 'Calls', data: cV, backgroundColor: 'rgba(0,255,136,0.1)', yAxisID: 'yV', stack: 'oi', order: 2 },
-                    { type: 'bar', label: 'Puts', data: pV, backgroundColor: 'rgba(255,68,68,0.1)', yAxisID: 'yV', stack: 'oi', order: 2 }
+                    { type: 'bar', label: 'Total Calls', data: cV, backgroundColor: 'rgba(0,255,136,0.1)', yAxisID: 'yV', stack: 'oi', order: 2 },
+                    { type: 'bar', label: 'Total Puts', data: pV, backgroundColor: 'rgba(255,68,68,0.1)', yAxisID: 'yV', stack: 'oi', order: 2 }
                 ]
             },
             options: { 
@@ -198,7 +200,7 @@
                 scales: { 
                     yP: { position: 'left', beginAtZero: false, grace: '10%' }, 
                     yB: { position: 'right', grid: { display: false } }, 
-                    yV: { display: false, stacked: true } 
+                    yV: { display: false, position: 'right', stacked: true } 
                 },
                 plugins: { legend: { labels: { color: '#fff', usePointStyle: true } } }
             }
