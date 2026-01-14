@@ -4,26 +4,20 @@
     <meta charset="UTF-8">
     <title>MSTR/BTC Strategic Monitor - Professional Suite</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.0.1"></script>
+    
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 20px; }
         .container { max-width: 1400px; margin: auto; background: #181818; padding: 25px; border-radius: 12px; border: 1px solid #333; }
-        
-        /* Controls & Analysis Section */
         .controls { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; border: 1px solid #444; }
         input { background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 4px; width: 100px; margin-left: 10px; }
         .score-box { text-align: center; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 2px solid transparent; }
         .safe-bg { background: rgba(0, 255, 136, 0.1); border-color: #00ff88; color: #00ff88; }
         .danger-bg { background: rgba(255, 68, 68, 0.1); border-color: #ff4444; color: #ff4444; }
-        
-        /* Chart Wrappers */
         #chart-wrapper { height: 500px; margin-top: 20px; }
         .section-header { margin-top: 60px; padding-top: 30px; border-top: 2px solid #333; }
-        
-        /* Scrollable Container for Chart 2 */
         .scroll-container { width: 100%; overflow-x: auto; background: #111; border-radius: 8px; margin-top: 15px; }
         .trend-chart-inner { width: 5000px; height: 500px; padding: 20px; }
-        
-        /* Accuracy Container for Chart 3 */
         .accuracy-container { height: 500px; margin-top: 20px; background: #111; border-radius: 8px; padding: 20px; }
     </style>
 </head>
@@ -40,20 +34,16 @@
 
         <div class="section-header">
             <h3>🕒 Historical Evolution Tracker (SGT)</h3>
-            <p style="font-size: 0.85em; color: #888;">Evolution of Max Pain leading up to each expiry. Each cluster is one specific option date.</p>
+            <p style="font-size: 0.85em; color: #888;">Daily snapshots of Max Pain. White vertical lines separate different option expiries.</p>
             <div class="scroll-container">
-                <div class="trend-chart-inner">
-                    <canvas id="trendChart"></canvas>
-                </div>
+                <div class="trend-chart-inner"><canvas id="trendChart"></canvas></div>
             </div>
         </div>
 
         <div class="section-header">
             <h3>🎯 Expiry Accuracy: Actual Close vs Max Pain</h3>
-            <p style="font-size: 0.85em; color: #888;">Actual MSTR Close (Yellow Star) vs the Friday close "Institutional Magnet".</p>
-            <div class="accuracy-container">
-                <canvas id="accuracyChart"></canvas>
-            </div>
+            <p style="font-size: 0.85em; color: #888;">Matches actual MSTR close (Yellow Star) vs the final Institutional Magnet.</p>
+            <div class="accuracy-container"><canvas id="accuracyChart"></canvas></div>
         </div>
     </div>
 
@@ -68,17 +58,23 @@
                 fetch('./data/expiry_history.json'),
                 fetch('./data/history_log.json')
             ]);
-            
-            globalPayload = await c.json();
+            const raw = await c.json();
             expiryHistory = await h.json();
             historyLog = await l.json();
 
-            document.getElementById('last-update').innerText = `Last Sync (SGT): ${globalPayload.last_update}`;
+            // PROFESSIONAL FILTER: Removes outliers (like $510) to keep axis clean
+            const spot = raw.spot;
+            globalPayload = {
+                ...raw,
+                data: raw.data.filter(d => d.mstr_pain > (spot * 0.4) && d.mstr_pain < (spot * 1.6))
+            };
+
+            document.getElementById('last-update').innerText = `Last Sync: ${globalPayload.last_update}`;
             renderMainChart();
             renderTrendChart();
             renderAccuracyChart();
             updateAnalysis();
-        } catch (e) { console.log("Awaiting data files..."); }
+        } catch (e) { console.error("Data Load Fail:", e); }
     }
 
     function updateAnalysis() {
@@ -87,10 +83,8 @@
         const score = globalPayload.spot > strike ? 10 : 4;
         document.getElementById('scoreValue').innerText = `Safety Score: ${score}/10`;
         document.getElementById('scoreBox').className = score >= 8 ? "score-box safe-bg" : "score-box danger-bg";
-        document.getElementById('scoreLabel').innerText = score >= 8 ? "SAFE TO PROCEED" : "HIGH RISK";
     }
 
-    // --- CHART 1: DAILY UPDATE (UNTOUCHED) ---
     function renderMainChart() {
         const ctx = document.getElementById('maxPainChart').getContext('2d');
         if (maxPainChart) maxPainChart.destroy();
@@ -98,21 +92,32 @@
             data: {
                 labels: globalPayload.data.map(d => d.date),
                 datasets: [
-                    { type: 'line', label: 'MSTR Pain', data: globalPayload.data.map(d => d.mstr_pain), borderColor: '#00ff88', borderWidth: 3, yAxisID: 'yP', tension: 0.3 },
-                    { type: 'line', label: 'BTC Pain', data: globalPayload.data.map(d => d.btc_pain), borderColor: '#3498db', yAxisID: 'yB', borderDash: [5,5] },
-                    { type: 'bar', label: 'Calls', data: globalPayload.data.map(d => d.call_oi), backgroundColor: 'rgba(0,255,136,0.15)', yAxisID: 'yV', stack: 'v1' },
-                    { type: 'bar', label: 'Puts', data: globalPayload.data.map(d => d.put_oi), backgroundColor: 'rgba(255,68,68,0.15)', yAxisID: 'yV', stack: 'v1' }
+                    { type: 'line', label: 'MSTR Pain', data: globalPayload.data.map(d => d.mstr_pain), borderColor: '#00ff88', borderWidth: 3, yAxisID: 'yP', tension: 0.3, order: 1 },
+                    { type: 'line', label: 'BTC Pain', data: globalPayload.data.map(d => d.btc_pain), borderColor: '#3498db', yAxisID: 'yB', borderDash: [5,5], order: 1 },
+                    { type: 'bar', label: 'Calls', data: globalPayload.data.map(d => d.call_oi), backgroundColor: 'rgba(0,255,136,0.1)', yAxisID: 'yV', stack: 'v1', order: 2 },
+                    { type: 'bar', label: 'Puts', data: globalPayload.data.map(d => d.put_oi), backgroundColor: 'rgba(255,68,68,0.1)', yAxisID: 'yV', stack: 'v1', order: 2 }
                 ]
             },
-            options: { responsive: true, maintainAspectRatio: false, scales: { yP: { position: 'left', beginAtZero: false, grace: '10%' }, yB: { position: 'right', grid: { display: false } }, yV: { display: false, stacked: true } } }
+            options: { 
+                responsive: true, maintainAspectRatio: false, 
+                scales: { 
+                    yP: { position: 'left', beginAtZero: false, grace: '10%', title: { display: true, text: 'MSTR ($)', color: '#00ff88' } }, 
+                    yB: { position: 'right', title: { display: true, text: 'BTC ($)', color: '#3498db' }, grid: { display: false } }, 
+                    // FIXED: Isolated Volume scale prevents price stunting
+                    yV: { display: false, position: 'right', beginAtZero: true, max: 2000000 } 
+                } 
+            }
         });
     }
 
-    // --- CHART 2: EVOLUTION TRACKER (UNTOUCHED) ---
     function renderTrendChart() {
         const ctx = document.getElementById('trendChart').getContext('2d');
         if (trendChart) trendChart.destroy();
+        
         const nestedLabels = [], mstr = [], btc = [], cV = [], pV = [];
+        const expiryBoundaries = [];
+        let currentIndex = 0;
+
         Object.keys(expiryHistory).sort().forEach(exp => {
             expiryHistory[exp].forEach((d) => {
                 nestedLabels.push([d.trade_date.slice(5), "EXP: " + exp.slice(5)]);
@@ -120,8 +125,11 @@
                 btc.push(d.btc_pain);
                 cV.push(d.call_oi);
                 pV.push(d.put_oi);
+                currentIndex++;
             });
+            expiryBoundaries.push(currentIndex - 0.5); // Logic for midpoint divider
         });
+
         trendChart = new Chart(ctx, {
             data: {
                 labels: nestedLabels,
@@ -129,76 +137,74 @@
                     { type: 'line', label: 'MSTR Pain', data: mstr, borderColor: '#00ff88', yAxisID: 'yP', pointRadius: 2 },
                     { type: 'line', label: 'BTC Pain', data: btc, borderColor: '#3498db', yAxisID: 'yB', borderDash: [2,2], pointRadius: 0 },
                     { type: 'bar', label: 'Calls', data: cV, backgroundColor: 'rgba(0,255,136,0.1)', yAxisID: 'yV', stack: 'h' },
-                    { type: 'bar', label: 'Puts', data: pV, backgroundColor: 'rgba(255, 68, 68, 0.1)', yAxisID: 'yV', stack: 'h' }
+                    { type: 'bar', label: 'Puts', data: pV, backgroundColor: 'rgba(255,68,68,0.1)', yAxisID: 'yV', stack: 'h' }
                 ]
             },
-            options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { font: { size: 9 }, autoSkip: false } }, yP: { position: 'left' }, yB: { position: 'right' }, yV: { display: false, stacked: true } } }
+            options: { 
+                responsive: true, maintainAspectRatio: false, 
+                scales: { 
+                    x: { ticks: { font: { size: 9 }, autoSkip: false } }, 
+                    yP: { position: 'left', beginAtZero: false }, 
+                    yB: { position: 'right' }, 
+                    yV: { display: false, position: 'right', stacked: true } 
+                },
+                plugins: {
+                    annotation: {
+                        annotations: expiryBoundaries.slice(0, -1).reduce((acc, boundary, i) => {
+                            acc[`line${i}`] = {
+                                type: 'line',
+                                xMin: boundary,
+                                xMax: boundary,
+                                borderColor: 'rgba(255, 255, 255, 0.4)',
+                                borderWidth: 1
+                            };
+                            return acc;
+                        }, {})
+                    }
+                }
+            }
         });
     }
 
-    // --- CHART 3: ACCURACY TRACKER (REFINED WITH STAR OVERLAY) ---
     function renderAccuracyChart() {
         const ctx = document.getElementById('accuracyChart').getContext('2d');
         if (accuracyChart) accuracyChart.destroy();
+        const labs = [], spots = [], pain = [], btc = [], cV = [], pV = [];
 
-        const labels = [], actualSpot = [], painTarget = [], btcTarget = [], callOI = [], putOI = [];
-
-        Object.keys(expiryHistory).sort().forEach(expiryDate => {
-            const cluster = expiryHistory[expiryDate];
+        Object.keys(expiryHistory).sort().forEach(expDate => {
+            const cluster = expiryHistory[expDate];
             if (!cluster || cluster.length === 0) return;
+            const finalPain = cluster[cluster.length - 1];
+            // Cross-reference logs for Friday close (recorded Saturday morning SGT)
+            const nextDay = new Date(new Date(expDate).getTime() + 86400000).toISOString().split('T')[0];
+            const logEntry = historyLog.find(l => l.date === nextDay) || historyLog.find(l => l.date === expDate);
 
-            // 1. Get final Max Pain target from the last calculation in the cluster
-            const finalPainEntry = cluster[cluster.length - 1];
-
-            // 2. Cross-reference Log for Actual Close. 
-            // Post-market run logs Friday close on Saturday SGT, so we check day-of and day-after
-            const nextDayDate = new Date(new Date(expiryDate).getTime() + 86400000);
-            const nextDayStr = nextDayDate.toISOString().split('T')[0];
-            const logEntry = historyLog.find(l => l.date === nextDayStr) || historyLog.find(l => l.date === expiryDate);
-
-            // 3. Strict display logic: only show finalized data
-            const todayStr = new Date().toISOString().split('T')[0];
-            if (logEntry && finalPainEntry && expiryDate < todayStr) {
-                labels.push(expiryDate);
-                actualSpot.push(logEntry.spot); // This will correctly pull $157.33 from the Jan 10 log
-                painTarget.push(finalPainEntry.mstr_pain);
-                btcTarget.push(finalPainEntry.btc_pain);
-                callOI.push(finalPainEntry.call_oi);
-                putOI.push(finalPainEntry.put_oi);
+            if (logEntry && finalPain && expDate < new Date().toISOString().split('T')[0]) {
+                labs.push(expDate); spots.push(logEntry.spot);
+                pain.push(finalPain.mstr_pain); btc.push(finalPain.btc_pain);
+                cV.push(finalPain.call_oi); pV.push(finalPain.put_oi);
             }
         });
 
         accuracyChart = new Chart(ctx, {
             data: {
-                labels: labels,
+                labels: labs,
                 datasets: [
-                    { 
-                        type: 'line', 
-                        label: 'Actual MSTR Close', 
-                        data: actualSpot, 
-                        borderColor: '#ffff00', 
-                        backgroundColor: '#ffff00',
-                        showLine: false,           
-                        pointStyle: 'star',        // Yellow star overlay
-                        pointRadius: 12,           
-                        yAxisID: 'yP', 
-                        order: 0                   
-                    },
-                    { type: 'line', label: 'MSTR Max Pain', data: painTarget, borderColor: '#00ff88', borderWidth: 3, pointRadius: 5, yAxisID: 'yP', order: 1, tension: 0 },
-                    { type: 'line', label: 'BTC Max Pain', data: btcTarget, borderColor: '#3498db', borderDash: [5,5], yAxisID: 'yB', order: 1 },
-                    { type: 'bar', label: 'Total Calls', data: callOI, backgroundColor: 'rgba(0, 255, 136, 0.1)', yAxisID: 'yV', stack: 'oi', order: 2 },
-                    { type: 'bar', label: 'Total Puts', data: putOI, backgroundColor: 'rgba(255, 68, 68, 0.1)', yAxisID: 'yV', stack: 'oi', order: 2 }
+                    { type: 'line', label: 'Actual Close', data: spots, borderColor: '#ffff00', backgroundColor: '#ffff00', showLine: false, pointStyle: 'star', pointRadius: 12, yAxisID: 'yP', order: 0 },
+                    { type: 'line', label: 'MSTR Pain', data: pain, borderColor: '#00ff88', borderWidth: 3, pointRadius: 5, yAxisID: 'yP', order: 1 },
+                    { type: 'line', label: 'BTC Pain', data: btc, borderColor: '#3498db', borderDash: [5,5], yAxisID: 'yB', order: 1 },
+                    { type: 'bar', label: 'Total Calls', data: cV, backgroundColor: 'rgba(0, 255, 136, 0.1)', yAxisID: 'yV', stack: 'oi', order: 2 },
+                    { type: 'bar', label: 'Total Puts', data: pV, backgroundColor: 'rgba(255, 68, 68, 0.1)', yAxisID: 'yV', stack: 'oi', order: 2 }
                 ]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    yP: { position: 'left', title: { display: true, text: 'MSTR Price ($)', color: '#fff' }, beginAtZero: false, grace: '10%' },
-                    yB: { position: 'right', title: { display: true, text: 'BTC Price ($)', color: '#3498db' }, grid: { display: false } },
-                    yV: { display: false, stacked: true }
+            options: { 
+                responsive: true, maintainAspectRatio: false, 
+                scales: { 
+                    yP: { position: 'left', beginAtZero: false, grace: '10%' }, 
+                    yB: { position: 'right', grid: { display: false } }, 
+                    yV: { display: false, position: 'right', stacked: true } 
                 },
-                plugins: { legend: { labels: { color: 'white', usePointStyle: true } } }
+                plugins: { legend: { labels: { color: '#fff', usePointStyle: true } } }
             }
         });
     }
