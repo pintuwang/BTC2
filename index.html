@@ -32,6 +32,7 @@
 
         <div class="section-header">
             <h3>🕒 Historical Evolution Tracker (SGT)</h3>
+            <p style="font-size: 0.85em; color: #888;">Evolution of Max Pain leading up to each expiry. Separated by white vertical lines.</p>
             <div class="scroll-container">
                 <div class="trend-chart-inner"><canvas id="trendChart"></canvas></div>
             </div>
@@ -39,6 +40,7 @@
 
         <div class="section-header">
             <h3>🎯 Expiry Accuracy: Actual Close vs Max Pain</h3>
+            <p style="font-size: 0.85em; color: #888;">Actual MSTR Close (Yellow Star) vs the Friday close "Institutional Magnet".</p>
             <div class="accuracy-container"><canvas id="accuracyChart"></canvas></div>
         </div>
     </div>
@@ -59,7 +61,7 @@
             expiryHistory = await h.json();
             historyLog = await l.json();
 
-            // FIX: Professional Filter to prevent squashed axis
+            // FIX: Professional Filter to remove $510 outliers squashing the chart
             const spot = rawPayload.spot;
             globalPayload = {
                 ...rawPayload,
@@ -71,7 +73,7 @@
             renderTrendChart();
             renderAccuracyChart();
             updateAnalysis();
-        } catch (e) { console.error("Awaiting data files...", e); }
+        } catch (e) { console.error("Data Load Error:", e); }
     }
 
     function updateAnalysis() {
@@ -95,7 +97,15 @@
                     { type: 'bar', label: 'Puts', data: globalPayload.data.map(d => d.put_oi), backgroundColor: 'rgba(255,68,68,0.15)', yAxisID: 'yV', stack: 'v1' }
                 ]
             },
-            options: { responsive: true, maintainAspectRatio: false, scales: { yP: { position: 'left', beginAtZero: false, grace: '10%' }, yB: { position: 'right', grid: { display: false } }, yV: { display: false, stacked: true } } }
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                scales: { 
+                    yP: { position: 'left', beginAtZero: false, grace: '15%', title: { display: true, text: 'MSTR ($)' } }, 
+                    yB: { position: 'right', title: { display: true, text: 'BTC ($)' }, grid: { display: false } }, 
+                    yV: { display: false, stacked: true } 
+                } 
+            }
         });
     }
 
@@ -140,10 +150,19 @@
                     { type: 'line', label: 'MSTR Pain', data: mstr, borderColor: '#00ff88', yAxisID: 'yP', pointRadius: 2 },
                     { type: 'line', label: 'BTC Pain', data: btc, borderColor: '#3498db', yAxisID: 'yB', borderDash: [2,2], pointRadius: 0 },
                     { type: 'bar', label: 'Calls', data: cV, backgroundColor: 'rgba(0,255,136,0.1)', yAxisID: 'yV', stack: 'h' },
-                    { type: 'bar', label: 'Puts', data: pV, backgroundColor: 'rgba(255,68,68,0.1)', yAxisID: 'yV', stack: 'h' }
+                    { type: 'bar', label: 'Puts', data: pV, backgroundColor: 'rgba(255, 68, 68, 0.1)', yAxisID: 'yV', stack: 'h' }
                 ]
             },
-            options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { font: { size: 9 }, autoSkip: false } }, yP: { position: 'left' }, yB: { position: 'right' }, yV: { display: false, stacked: true } } }
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                scales: { 
+                    x: { ticks: { font: { size: 9 }, autoSkip: false } }, 
+                    yP: { position: 'left', beginAtZero: false, grace: '5%' }, 
+                    yB: { position: 'right', beginAtZero: false }, 
+                    yV: { display: false, stacked: true } 
+                } 
+            }
         });
     }
 
@@ -156,9 +175,11 @@
             const cluster = expiryHistory[expiryDate];
             if (!cluster || cluster.length === 0) return;
             const finalPainEntry = cluster[cluster.length - 1];
+            // Fix: Correct date offset for Singapore Time vs US Close
             const nextDayStr = new Date(new Date(expiryDate).getTime() + 86400000).toISOString().split('T')[0];
             const logEntry = historyLog.find(l => l.date === nextDayStr) || historyLog.find(l => l.date === expiryDate);
             const todayStr = new Date().toISOString().split('T')[0];
+            
             if (logEntry && finalPainEntry && expiryDate < todayStr) {
                 labels.push(expiryDate);
                 actualSpot.push(logEntry.spot);
@@ -180,7 +201,16 @@
                     { type: 'bar', label: 'Total Puts', data: putOI, backgroundColor: 'rgba(255, 68, 68, 0.1)', yAxisID: 'yV', stack: 'oi', order: 2 }
                 ]
             },
-            options: { responsive: true, maintainAspectRatio: false, scales: { yP: { position: 'left', beginAtZero: false, grace: '10%' }, yB: { position: 'right', grid: { display: false } }, yV: { display: false, stacked: true } }, plugins: { legend: { labels: { color: 'white', usePointStyle: true } } } }
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                scales: { 
+                    yP: { position: 'left', beginAtZero: false, grace: '10%' }, 
+                    yB: { position: 'right', grid: { display: false } }, 
+                    yV: { display: false, stacked: true } 
+                }, 
+                plugins: { legend: { labels: { color: 'white', usePointStyle: true } } } 
+            }
         });
     }
 </script>
