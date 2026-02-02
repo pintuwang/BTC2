@@ -5,7 +5,6 @@
     <title>MSTR/BTC Strategic Monitor - Professional Suite</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.0.1"></script>
-    
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 20px; }
         .container { max-width: 1400px; margin: auto; background: #181818; padding: 25px; border-radius: 12px; border: 1px solid #333; }
@@ -34,7 +33,7 @@
 
         <div class="section-header">
             <h3>🕒 Historical Evolution Tracker (SGT)</h3>
-            <p style="font-size: 0.85em; color: #888;">Daily Max Pain snapshots. <span style="background:white; color:black; padding:2px;">White background</span> indicates future options.</p>
+            <p style="font-size: 0.85em; color: #888;">Daily snapshots. <span style="background:white; color:black; padding:2px;">White background</span> indicates future options.</p>
             <div class="scroll-container">
                 <div class="trend-chart-inner"><canvas id="trendChart"></canvas></div>
             </div>
@@ -42,7 +41,7 @@
 
         <div class="section-header">
             <h3>🎯 Expiry Accuracy: Actual Close vs Max Pain</h3>
-            <p style="font-size: 0.85em; color: #888;">MSTR (Yellow Star) and BTC (Orange Circle) vs Institutional Magnets.</p>
+            <p style="font-size: 0.85em; color: #888;">MSTR (Star) and BTC (Orange Circle) vs Institutional Magnets.</p>
             <div class="accuracy-container"><canvas id="accuracyChart"></canvas></div>
         </div>
     </div>
@@ -56,7 +55,7 @@
             const [c, h, l] = await Promise.all([
                 fetch('./data/history.json'), fetch('./data/expiry_history.json'), fetch('./data/history_log.json')
             ]);
-            globalPayload = await c.json(); // Full restore of all data points
+            globalPayload = await c.json();
             expiryHistory = await h.json();
             historyLog = await l.json();
             
@@ -91,7 +90,7 @@
                 scales: { 
                     yP: { position: 'left', beginAtZero: false, grace: '10%' }, 
                     yB: { position: 'right', grid: { display: false } }, 
-                    // FIXED: Independent right-side scale for volume prevents price stunting
+                    // FIXED: Independent scale prevents glitch prices from squashing lines
                     yV: { display: false, position: 'right', beginAtZero: true, max: 2000000 } 
                 } 
             }
@@ -174,9 +173,8 @@
             options: { 
                 responsive: true, maintainAspectRatio: false, 
                 scales: { 
-                    yP: { position: 'left', title: { display: true, text: 'MSTR Price ($)', color: '#fff' }, beginAtZero: false, grace: '10%' }, 
-                    yB: { position: 'right', title: { display: true, text: 'BTC Price ($)', color: '#3498db' } }, 
-                    yV: { display: false, position: 'right', stacked: true } 
+                    yP: { position: 'left', beginAtZero: false, grace: '10%' }, 
+                    yB: { position: 'right' }, yV: { display: false, stacked: true } 
                 },
                 plugins: { legend: { labels: { color: '#fff', usePointStyle: true } } }
             }
@@ -185,4 +183,3 @@
 </script>
 </body>
 </html>
-
