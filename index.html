@@ -34,7 +34,7 @@
 
         <div class="section-header">
             <h3>🕒 Historical Evolution Tracker (SGT)</h3>
-            <p style="font-size: 0.85em; color: #888;">Daily Max Pain. <span style="background:white; color:black; padding:2px;">White background</span> indicates future options. Black lines separate groups.</p>
+            <p style="font-size: 0.85em; color: #888;">Daily Max Pain snapshots. <span style="background:white; color:black; padding:2px;">White background</span> indicates future options.</p>
             <div class="scroll-container">
                 <div class="trend-chart-inner"><canvas id="trendChart"></canvas></div>
             </div>
@@ -42,7 +42,7 @@
 
         <div class="section-header">
             <h3>🎯 Expiry Accuracy: Actual Close vs Max Pain</h3>
-            <p style="font-size: 0.85em; color: #888;">MSTR (Star) and BTC (Orange Circle) vs Institutional Magnets.</p>
+            <p style="font-size: 0.85em; color: #888;">MSTR (Yellow Star) and BTC (Orange Circle) vs Institutional Magnets.</p>
             <div class="accuracy-container"><canvas id="accuracyChart"></canvas></div>
         </div>
     </div>
@@ -56,12 +56,9 @@
             const [c, h, l] = await Promise.all([
                 fetch('./data/history.json'), fetch('./data/expiry_history.json'), fetch('./data/history_log.json')
             ]);
-            const raw = await c.json();
+            globalPayload = await c.json(); // Full restore of all data points
             expiryHistory = await h.json();
             historyLog = await l.json();
-            
-            // FIXED: Filter removed to restore all weekly expiries to Chart 1
-            globalPayload = raw;
             
             document.getElementById('last-update').innerText = `Last Sync: ${globalPayload.last_update}`;
             renderMainChart(); renderTrendChart(); renderAccuracyChart(); updateAnalysis();
@@ -94,6 +91,7 @@
                 scales: { 
                     yP: { position: 'left', beginAtZero: false, grace: '10%' }, 
                     yB: { position: 'right', grid: { display: false } }, 
+                    // FIXED: Independent right-side scale for volume prevents price stunting
                     yV: { display: false, position: 'right', beginAtZero: true, max: 2000000 } 
                 } 
             }
@@ -137,7 +135,7 @@
                 responsive: true, maintainAspectRatio: false, 
                 scales: { 
                     x: { ticks: { font: { size: 9 }, color: '#444', autoSkip: false } }, 
-                    yP: { position: 'left' }, yB: { position: 'right' }, yV: { display: false, stacked: true } 
+                    yP: { position: 'left' }, yB: { position: 'right' }, yV: { display: false, position: 'right', stacked: true } 
                 },
                 plugins: { annotation: { annotations: annotations } }
             }
@@ -178,7 +176,7 @@
                 scales: { 
                     yP: { position: 'left', title: { display: true, text: 'MSTR Price ($)', color: '#fff' }, beginAtZero: false, grace: '10%' }, 
                     yB: { position: 'right', title: { display: true, text: 'BTC Price ($)', color: '#3498db' } }, 
-                    yV: { display: false, stacked: true } 
+                    yV: { display: false, position: 'right', stacked: true } 
                 },
                 plugins: { legend: { labels: { color: '#fff', usePointStyle: true } } }
             }
