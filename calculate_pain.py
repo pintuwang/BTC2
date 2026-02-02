@@ -103,7 +103,7 @@ def run_update():
     payload = {
         "last_update": datetime.now(SGT).strftime("%Y-%m-%d %H:%M"),
         "spot": round(mstr_spot, 2),
-        "btc_spot": round(btc_spot, 2), # Included in payload for frontend access
+        "btc_spot": round(btc_spot, 2), # Included for frontend access
         "data": chain_data
     }
     with open('data/history.json', 'w') as f:
