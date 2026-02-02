@@ -1,6 +1,7 @@
 import os
 import json
 import requests
+import time
 import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta, timezone
@@ -9,27 +10,35 @@ from datetime import datetime, timedelta, timezone
 SGT = timezone(timedelta(hours=8))
 
 def calculate_max_pain(ticker_obj, expiry_date):
-    """Calculates Max Pain strike and total Open Interest."""
-    try:
-        chain = ticker_obj.option_chain(expiry_date)
-        total_call_oi = int(chain.calls['openInterest'].sum())
-        total_put_oi = int(chain.puts['openInterest'].sum())
+    """Calculates Max Pain strike and total Open Interest with Retries."""
+    for attempt in range(3): # Attempt to fetch data 3 times to avoid Yahoo glitches
+        try:
+            chain = ticker_obj.option_chain(expiry_date)
+            total_call_oi = int(chain.calls['openInterest'].sum())
+            total_put_oi = int(chain.puts['openInterest'].sum())
 
-        calls = chain.calls[chain.calls['openInterest'] >= 10][['strike', 'openInterest']].fillna(0)
-        puts = chain.puts[chain.puts['openInterest'] >= 10][['strike', 'openInterest']].fillna(0)
-        
-        strikes = sorted(set(calls['strike']).union(set(puts['strike'])))
-        if not strikes: return None, 0, 0
-        
-        pain_results = []
-        for s in strikes:
-            cl = calls[calls['strike'] < s].apply(lambda x: (s - x['strike']) * x['openInterest'], axis=1).sum()
-            pl = puts[puts['strike'] > s].apply(lambda x: (x['strike'] - s) * x['openInterest'], axis=1).sum()
-            pain_results.append({'strike': s, 'total': cl + pl})
-        
-        max_p = float(pd.DataFrame(pain_results).sort_values('total').iloc[0]['strike'])
-        return max_p, total_call_oi, total_put_oi
-    except: return None, 0, 0
+            # If OI is suspiciously low, it's likely a partial data glitch; retry.
+            if total_call_oi < 100:
+                time.sleep(1)
+                continue
+
+            calls = chain.calls[chain.calls['openInterest'] >= 10][['strike', 'openInterest']].fillna(0)
+            puts = chain.puts[chain.puts['openInterest'] >= 10][['strike', 'openInterest']].fillna(0)
+            
+            strikes = sorted(set(calls['strike']).union(set(puts['strike'])))
+            if not strikes: return None, 0, 0
+            
+            pain_results = []
+            for s in strikes:
+                cl = calls[calls['strike'] < s].apply(lambda x: (s - x['strike']) * x['openInterest'], axis=1).sum()
+                pl = puts[puts['strike'] > s].apply(lambda x: (x['strike'] - s) * x['openInterest'], axis=1).sum()
+                pain_results.append({'strike': s, 'total': cl + pl})
+            
+            max_p = float(pd.DataFrame(pain_results).sort_values('total').iloc[0]['strike'])
+            return max_p, total_call_oi, total_put_oi
+        except:
+            time.sleep(1)
+    return None, 0, 0
 
 def get_btc_expiry_pains():
     """Fetches real BTC Max Pain data from Deribit."""
@@ -72,14 +81,14 @@ def update_expiry_history(chain_data):
 
 def run_update():
     mstr = yf.Ticker("MSTR")
-    btc = yf.Ticker("BTC-USD") # Added BTC ticker for spot logging
+    btc = yf.Ticker("BTC-USD")
     
     try:
         mstr_spot = mstr.history(period="1d")['Close'].iloc[-1]
-        btc_spot = btc.history(period="1d")['Close'].iloc[-1] # Fetch BTC Spot
+        btc_spot = btc.history(period="1d")['Close'].iloc[-1]
     except:
-        mstr_spot = 165.0
-        btc_spot = 95000.0
+        mstr_spot = 150.0
+        btc_spot = 75000.0
 
     btc_dict = get_btc_expiry_pains()
     cutoff = (datetime.now(SGT) + timedelta(days=180)).strftime("%Y-%m-%d")
@@ -103,7 +112,7 @@ def run_update():
     payload = {
         "last_update": datetime.now(SGT).strftime("%Y-%m-%d %H:%M"),
         "spot": round(mstr_spot, 2),
-        "btc_spot": round(btc_spot, 2), # Included for frontend access
+        "btc_spot": round(btc_spot, 2),
         "data": chain_data
     }
     with open('data/history.json', 'w') as f:
@@ -111,21 +120,15 @@ def run_update():
 
     update_expiry_history(chain_data)
     
-    # --- UPDATED LOGGING LOGIC: Includes BTC Spot for Accuracy Chart ---
     log_path = 'data/history_log.json'
     log = json.load(open(log_path)) if os.path.exists(log_path) else []
     today = datetime.now(SGT).strftime("%Y-%m-%d")
     
     if log and log[-1]['date'] == today:
         log[-1]['spot'] = payload["spot"]
-        log[-1]['btc_spot'] = payload["btc_spot"] # Update same-day BTC
+        log[-1]['btc_spot'] = payload["btc_spot"]
     else:
-        # Add new entry with both MSTR and BTC spot prices
-        log.append({
-            "date": today, 
-            "spot": payload["spot"], 
-            "btc_spot": payload["btc_spot"]
-        })
+        log.append({"date": today, "spot": payload["spot"], "btc_spot": payload["btc_spot"]})
     
     with open(log_path, 'w') as f:
         json.dump(log[-60:], f, indent=4)
@@ -134,3 +137,4 @@ def run_update():
 
 if __name__ == "__main__":
     run_update()
+
