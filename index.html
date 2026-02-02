@@ -60,12 +60,8 @@
             expiryHistory = await h.json();
             historyLog = await l.json();
             
-            // PROFESSIONAL FILTER: Prevents glitched points (like $510) from squashing the scale
-            const spot = raw.spot;
-            globalPayload = { 
-                ...raw, 
-                data: raw.data.filter(d => d.mstr_pain > (spot * 0.4) && d.mstr_pain < (spot * 1.6)) 
-            };
+            // FIXED: Filter removed to restore all weekly expiries to Chart 1
+            globalPayload = raw;
             
             document.getElementById('last-update').innerText = `Last Sync: ${globalPayload.last_update}`;
             renderMainChart(); renderTrendChart(); renderAccuracyChart(); updateAnalysis();
@@ -191,3 +187,4 @@
 </script>
 </body>
 </html>
+
