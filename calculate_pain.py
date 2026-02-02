@@ -72,10 +72,14 @@ def update_expiry_history(chain_data):
 
 def run_update():
     mstr = yf.Ticker("MSTR")
+    btc = yf.Ticker("BTC-USD") # Added BTC ticker for spot logging
+    
     try:
         mstr_spot = mstr.history(period="1d")['Close'].iloc[-1]
+        btc_spot = btc.history(period="1d")['Close'].iloc[-1] # Fetch BTC Spot
     except:
         mstr_spot = 165.0
+        btc_spot = 95000.0
 
     btc_dict = get_btc_expiry_pains()
     cutoff = (datetime.now(SGT) + timedelta(days=180)).strftime("%Y-%m-%d")
@@ -99,6 +103,7 @@ def run_update():
     payload = {
         "last_update": datetime.now(SGT).strftime("%Y-%m-%d %H:%M"),
         "spot": round(mstr_spot, 2),
+        "btc_spot": round(btc_spot, 2), # Included in payload for frontend access
         "data": chain_data
     }
     with open('data/history.json', 'w') as f:
@@ -106,15 +111,21 @@ def run_update():
 
     update_expiry_history(chain_data)
     
-    # --- FIXED LOGGING LOGIC: Overwrite same-day spot price for accuracy ---
+    # --- UPDATED LOGGING LOGIC: Includes BTC Spot for Accuracy Chart ---
     log_path = 'data/history_log.json'
     log = json.load(open(log_path)) if os.path.exists(log_path) else []
     today = datetime.now(SGT).strftime("%Y-%m-%d")
     
     if log and log[-1]['date'] == today:
-        log[-1]['spot'] = payload["spot"] # Update existing intra-day entry
+        log[-1]['spot'] = payload["spot"]
+        log[-1]['btc_spot'] = payload["btc_spot"] # Update same-day BTC
     else:
-        log.append({"date": today, "spot": payload["spot"]}) # Add new entry
+        # Add new entry with both MSTR and BTC spot prices
+        log.append({
+            "date": today, 
+            "spot": payload["spot"], 
+            "btc_spot": payload["btc_spot"]
+        })
     
     with open(log_path, 'w') as f:
         json.dump(log[-60:], f, indent=4)
