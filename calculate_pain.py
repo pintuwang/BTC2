@@ -11,14 +11,14 @@ SGT = timezone(timedelta(hours=8))
 
 def calculate_max_pain(ticker_obj, expiry_date):
     """Calculates Max Pain strike and total Open Interest with Retries."""
-    for attempt in range(3): # Attempt to fetch data 3 times to avoid Yahoo glitches
+    for attempt in range(3): # Attempt 3 times to avoid Yahoo data gaps
         try:
             chain = ticker_obj.option_chain(expiry_date)
             total_call_oi = int(chain.calls['openInterest'].sum())
             total_put_oi = int(chain.puts['openInterest'].sum())
 
-            # If OI is suspiciously low, it's likely a partial data glitch; retry.
-            if total_call_oi < 100:
+            # Partial data check: If OI is suspiciously low, retry the fetch
+            if total_call_oi < 100 and attempt < 2:
                 time.sleep(1)
                 continue
 
@@ -54,7 +54,7 @@ def get_btc_expiry_pains():
     except: return {}
 
 def update_expiry_history(chain_data):
-    """Maintains a rolling 10-day history for every expiry. Retains past data for 6 months."""
+    """Maintains rolling 10-day history for every expiry. Retains data for 6 months."""
     path = 'data/expiry_history.json'
     history = json.load(open(path)) if os.path.exists(path) else {}
     today_sgt = datetime.now(SGT).strftime("%Y-%m-%d")
