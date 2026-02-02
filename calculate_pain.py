@@ -16,10 +16,12 @@ def calculate_max_pain(ticker_obj, expiry_date):
             chain = ticker_obj.option_chain(expiry_date)
             total_call_oi = int(chain.calls['openInterest'].sum())
             total_put_oi = int(chain.puts['openInterest'].sum())
+            total_oi = total_call_oi + total_put_oi
 
-            # Filter out extreme outliers by requiring a minimum liquidity floor
-            if total_call_oi < 50 and attempt < 2:
-                time.sleep(1)
+            # LIQUIDITY GUARD: MSTR weekly/monthly OI should never be tiny.
+            # If total OI is < 1000, Yahoo is definitely glitching.
+            if total_oi < 1000 and attempt < 2:
+                time.sleep(2)
                 continue
 
             calls = chain.calls[chain.calls['openInterest'] >= 10][['strike', 'openInterest']].fillna(0)
@@ -37,24 +39,11 @@ def calculate_max_pain(ticker_obj, expiry_date):
             max_p = float(pd.DataFrame(pain_results).sort_values('total').iloc[0]['strike'])
             return max_p, total_call_oi, total_put_oi
         except:
-            time.sleep(1)
+            time.sleep(2)
     return None, 0, 0
 
-def get_btc_expiry_pains():
-    """Fetches real BTC Max Pain data from Deribit."""
-    try:
-        url = "https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option"
-        resp = requests.get(url, timeout=15).json().get('result', [])
-        results = {}
-        for item in resp:
-            parts = item['instrument_name'].split('-')
-            dt = datetime.strptime(parts[1], "%d%b%y").strftime("%Y-%m-%d")
-            if dt not in results: results[dt] = float(parts[2])
-        return results
-    except: return {}
-
 def update_expiry_history(chain_data):
-    """Maintains rolling 10-day history for every expiry. Retains past data for 6 months."""
+    """Maintains data and prevents overwriting good data with glitches."""
     path = 'data/expiry_history.json'
     history = json.load(open(path)) if os.path.exists(path) else {}
     today_sgt = datetime.now(SGT).strftime("%Y-%m-%d")
@@ -63,17 +52,22 @@ def update_expiry_history(chain_data):
         exp = entry['date']
         if exp not in history: history[exp] = []
         
+        # QUALITY CHECK: Don't save if current OI is < 20% of yesterday (Clear Glitch)
+        if history[exp]:
+            prev = history[exp][-1]
+            prev_oi = prev['call_oi'] + prev['put_oi']
+            curr_oi = entry['call_oi'] + entry['put_oi']
+            if curr_oi < (prev_oi * 0.2) and prev_oi > 5000:
+                print(f"Skipping {exp}: Detected OI Data Glitch ({curr_oi} vs {prev_oi})")
+                continue
+
         if not history[exp] or history[exp][-1]['trade_date'] != today_sgt:
             history[exp].append({
-                "trade_date": today_sgt,
-                "mstr_pain": entry['mstr_pain'],
-                "btc_pain": entry['btc_pain'],
-                "call_oi": entry['call_oi'],
-                "put_oi": entry['put_oi']
+                "trade_date": today_sgt, "mstr_pain": entry['mstr_pain'],
+                "btc_pain": entry['btc_pain'], "call_oi": entry['call_oi'], "put_oi": entry['put_oi']
             })
         history[exp] = history[exp][-10:]
 
-    # Clean up very old expiries
     cutoff = (datetime.now(SGT) - timedelta(days=180)).strftime("%Y-%m-%d")
     return {k: v for k, v in history.items() if k >= cutoff}
 
@@ -85,73 +79,56 @@ def run_update():
         mstr_spot = mstr.history(period="1d")['Close'].iloc[-1]
         btc_spot = btc.history(period="1d")['Close'].iloc[-1]
     except:
-        mstr_spot = 150.0
-        btc_spot = 75000.0
+        mstr_spot, btc_spot = 150.0, 75000.0
 
-    btc_dict = get_btc_expiry_pains()
     all_options = mstr.options
-    
-    # 1. Fetch current data for whatever expiries Yahoo is showing right now
     current_chain_data = []
     for exp in all_options:
         m_pain, m_call_oi, m_put_oi = calculate_max_pain(mstr, exp)
         if m_pain:
             current_chain_data.append({
-                "date": exp,
-                "mstr_pain": round(m_pain, 2),
-                "btc_pain": btc_dict.get(exp, 95000.0),
-                "call_oi": m_call_oi,
-                "put_oi": m_put_oi,
-                "is_monthly": (15 <= int(exp.split('-')[2]) <= 21)
+                "date": exp, "mstr_pain": round(m_pain, 2),
+                "btc_pain": 95000.0, "call_oi": m_call_oi, "put_oi": m_put_oi
             })
 
-    os.makedirs('data', exist_ok=True)
-    
-    # 2. Update and save the permanent history
     full_history = update_expiry_history(current_chain_data)
+    os.makedirs('data', exist_ok=True)
     with open('data/expiry_history.json', 'w') as f:
         json.dump(full_history, f, indent=4)
 
-    # 3. CONSTRUCT STRATEGIC UPDATE (CHART 1): Pull latest from permanent history
-    # This prevents the "only monthly" issue if Yahoo is glitching
+    # RECONSTRUCT CHART 1: Ensure glitches don't break the dashboard
     strategic_list = []
     today_str = datetime.now(SGT).strftime("%Y-%m-%d")
-    
     for exp_date in sorted(full_history.keys()):
-        if exp_date < today_str: continue # Skip expired
-        latest_data = full_history[exp_date][-1]
-        strategic_list.append({
-            "date": exp_date,
-            "mstr_pain": latest_data["mstr_pain"],
-            "btc_pain": latest_data["btc_pain"],
-            "call_oi": latest_data["call_oi"],
-            "put_oi": latest_data["put_oi"],
-            "is_monthly": (15 <= int(exp_date.split('-')[2]) <= 21)
-        })
+        if exp_date < today_str: continue
+        latest = full_history[exp_date][-1]
+        # FINAL SANITY CHECK: Only show expiries with reasonable price range
+        if latest["mstr_pain"] > (mstr_spot * 0.4) and latest["mstr_pain"] < (mstr_spot * 1.8):
+            strategic_list.append({
+                "date": exp_date, "mstr_pain": latest["mstr_pain"], "btc_pain": latest["btc_pain"],
+                "call_oi": latest["call_oi"], "put_oi": latest["put_oi"],
+                "is_monthly": (15 <= int(exp_date.split('-')[2]) <= 21)
+            })
 
     payload = {
         "last_update": datetime.now(SGT).strftime("%Y-%m-%d %H:%M"),
-        "spot": round(mstr_spot, 2),
-        "btc_spot": round(btc_spot, 2),
-        "data": strategic_list # Now contains ALL tracked weeklies
+        "spot": round(mstr_spot, 2), "btc_spot": round(btc_spot, 2), "data": strategic_list
     }
     with open('data/history.json', 'w') as f:
         json.dump(payload, f, indent=4)
 
-    # 4. Standard Logging for Accuracy
+    # Accuracy Log update
     log_path = 'data/history_log.json'
     log = json.load(open(log_path)) if os.path.exists(log_path) else []
     today = datetime.now(SGT).strftime("%Y-%m-%d")
     if log and log[-1]['date'] == today:
-        log[-1]['spot'] = payload["spot"]
-        log[-1]['btc_spot'] = payload["btc_spot"]
+        log[-1].update({"spot": payload["spot"], "btc_spot": payload["btc_spot"]})
     else:
         log.append({"date": today, "spot": payload["spot"], "btc_spot": payload["btc_spot"]})
-    
     with open(log_path, 'w') as f:
         json.dump(log[-60:], f, indent=4)
     
-    print(f"Update Finished (SGT). {len(strategic_list)} active expiries tracked.")
+    print(f"Sync Complete. {len(strategic_list)} valid expiries recorded.")
 
 if __name__ == "__main__":
     run_update()
