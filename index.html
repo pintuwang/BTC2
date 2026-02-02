@@ -34,7 +34,7 @@
 
         <div class="section-header">
             <h3>🕒 Historical Evolution Tracker (SGT)</h3>
-            <p style="font-size: 0.85em; color: #888;">Daily Max Pain. <span style="background:white; color:black; padding:2px;">White background</span> indicates future options.</p>
+            <p style="font-size: 0.85em; color: #888;">Daily Max Pain. <span style="background:white; color:black; padding:2px;">White background</span> indicates future options. Black lines separate groups.</p>
             <div class="scroll-container">
                 <div class="trend-chart-inner"><canvas id="trendChart"></canvas></div>
             </div>
@@ -56,9 +56,16 @@
             const [c, h, l] = await Promise.all([
                 fetch('./data/history.json'), fetch('./data/expiry_history.json'), fetch('./data/history_log.json')
             ]);
-            globalPayload = await c.json(); // Filter removed to restore all data points
+            const raw = await c.json();
             expiryHistory = await h.json();
             historyLog = await l.json();
+            
+            // PROFESSIONAL FILTER: Prevents glitched points (like $510) from squashing the scale
+            const spot = raw.spot;
+            globalPayload = { 
+                ...raw, 
+                data: raw.data.filter(d => d.mstr_pain > (spot * 0.4) && d.mstr_pain < (spot * 1.6)) 
+            };
             
             document.getElementById('last-update').innerText = `Last Sync: ${globalPayload.last_update}`;
             renderMainChart(); renderTrendChart(); renderAccuracyChart(); updateAnalysis();
@@ -91,7 +98,6 @@
                 scales: { 
                     yP: { position: 'left', beginAtZero: false, grace: '10%' }, 
                     yB: { position: 'right', grid: { display: false } }, 
-                    // FIXED: Isolated yV axis prevents price stunting
                     yV: { display: false, position: 'right', beginAtZero: true, max: 2000000 } 
                 } 
             }
@@ -118,9 +124,7 @@
 
         const annotations = {};
         boundaries.forEach((b, i) => {
-            // Dividing line (Black)
             annotations[`line${i}`] = { type: 'line', xMin: b.boundary, xMax: b.boundary, borderColor: '#000000', borderWidth: 2 };
-            // Background Box (White for future options)
             if (b.isFuture) {
                 annotations[`box${i}`] = { type: 'box', xMin: b.start, xMax: b.end, backgroundColor: 'rgba(255, 255, 255, 1)', drawTime: 'beforeDatasetsDraw' };
             }
@@ -158,7 +162,7 @@
 
             if (logEntry && finalPain && expDate < new Date().toISOString().split('T')[0]) {
                 labs.push(expDate); spots.push(logEntry.spot);
-                btcSpots.push(logEntry.btc_spot || null); // Pull BTC Spot for orange dots
+                btcSpots.push(logEntry.btc_spot || null);
                 pain.push(finalPain.mstr_pain); btcPain.push(finalPain.btc_pain);
                 cV.push(finalPain.call_oi); pV.push(finalPain.put_oi);
             }
@@ -167,7 +171,7 @@
         accuracyChart = new Chart(ctx, {
             data: { labels: labs, datasets: [
                 { type: 'line', label: 'MSTR Close', data: spots, borderColor: '#ffff00', backgroundColor: '#ffff00', showLine: false, pointStyle: 'star', pointRadius: 12, yAxisID: 'yP', order: 0 },
-                { type: 'line', label: 'BTC Close', data: btcSpots, borderColor: '#ffa500', backgroundColor: '#ffa500', showLine: false, pointStyle: 'circle', pointRadius: 8, yAxisID: 'yB', order: 0 }, // Orange dots
+                { type: 'line', label: 'BTC Close', data: btcSpots, borderColor: '#ffa500', backgroundColor: '#ffa500', showLine: false, pointStyle: 'circle', pointRadius: 8, yAxisID: 'yB', order: 0 },
                 { type: 'line', label: 'MSTR Pain', data: pain, borderColor: '#00ff88', borderWidth: 3, pointRadius: 5, yAxisID: 'yP', order: 1 },
                 { type: 'line', label: 'BTC Pain', data: btcPain, borderColor: '#3498db', borderDash: [5,5], yAxisID: 'yB', order: 1 },
                 { type: 'bar', label: 'Total Calls', data: cV, backgroundColor: 'rgba(0, 255, 136, 0.1)', yAxisID: 'yV', stack: 'oi', order: 2 },
