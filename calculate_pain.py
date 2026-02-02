@@ -11,14 +11,14 @@ SGT = timezone(timedelta(hours=8))
 
 def calculate_max_pain(ticker_obj, expiry_date):
     """Calculates Max Pain strike and total Open Interest with Retries."""
-    for attempt in range(3): # Attempt 3 times to avoid Yahoo data gaps
+    for attempt in range(3):
         try:
             chain = ticker_obj.option_chain(expiry_date)
             total_call_oi = int(chain.calls['openInterest'].sum())
             total_put_oi = int(chain.puts['openInterest'].sum())
 
-            # Partial data check: If OI is suspiciously low, retry the fetch
-            if total_call_oi < 100 and attempt < 2:
+            # Filter out extreme outliers by requiring a minimum liquidity floor
+            if total_call_oi < 50 and attempt < 2:
                 time.sleep(1)
                 continue
 
@@ -54,7 +54,7 @@ def get_btc_expiry_pains():
     except: return {}
 
 def update_expiry_history(chain_data):
-    """Maintains rolling 10-day history for every expiry. Retains data for 6 months."""
+    """Maintains rolling 10-day history for every expiry. Retains past data for 6 months."""
     path = 'data/expiry_history.json'
     history = json.load(open(path)) if os.path.exists(path) else {}
     today_sgt = datetime.now(SGT).strftime("%Y-%m-%d")
@@ -73,11 +73,9 @@ def update_expiry_history(chain_data):
             })
         history[exp] = history[exp][-10:]
 
+    # Clean up very old expiries
     cutoff = (datetime.now(SGT) - timedelta(days=180)).strftime("%Y-%m-%d")
-    history = {k: v for k, v in history.items() if k >= cutoff}
-    
-    with open(path, 'w') as f:
-        json.dump(history, f, indent=4)
+    return {k: v for k, v in history.items() if k >= cutoff}
 
 def run_update():
     mstr = yf.Ticker("MSTR")
@@ -91,14 +89,14 @@ def run_update():
         btc_spot = 75000.0
 
     btc_dict = get_btc_expiry_pains()
-    cutoff = (datetime.now(SGT) + timedelta(days=180)).strftime("%Y-%m-%d")
-    all_options = [e for e in mstr.options if e <= cutoff]
+    all_options = mstr.options
     
-    chain_data = []
+    # 1. Fetch current data for whatever expiries Yahoo is showing right now
+    current_chain_data = []
     for exp in all_options:
         m_pain, m_call_oi, m_put_oi = calculate_max_pain(mstr, exp)
         if m_pain:
-            chain_data.append({
+            current_chain_data.append({
                 "date": exp,
                 "mstr_pain": round(m_pain, 2),
                 "btc_pain": btc_dict.get(exp, 95000.0),
@@ -109,21 +107,41 @@ def run_update():
 
     os.makedirs('data', exist_ok=True)
     
+    # 2. Update and save the permanent history
+    full_history = update_expiry_history(current_chain_data)
+    with open('data/expiry_history.json', 'w') as f:
+        json.dump(full_history, f, indent=4)
+
+    # 3. CONSTRUCT STRATEGIC UPDATE (CHART 1): Pull latest from permanent history
+    # This prevents the "only monthly" issue if Yahoo is glitching
+    strategic_list = []
+    today_str = datetime.now(SGT).strftime("%Y-%m-%d")
+    
+    for exp_date in sorted(full_history.keys()):
+        if exp_date < today_str: continue # Skip expired
+        latest_data = full_history[exp_date][-1]
+        strategic_list.append({
+            "date": exp_date,
+            "mstr_pain": latest_data["mstr_pain"],
+            "btc_pain": latest_data["btc_pain"],
+            "call_oi": latest_data["call_oi"],
+            "put_oi": latest_data["put_oi"],
+            "is_monthly": (15 <= int(exp_date.split('-')[2]) <= 21)
+        })
+
     payload = {
         "last_update": datetime.now(SGT).strftime("%Y-%m-%d %H:%M"),
         "spot": round(mstr_spot, 2),
         "btc_spot": round(btc_spot, 2),
-        "data": chain_data
+        "data": strategic_list # Now contains ALL tracked weeklies
     }
     with open('data/history.json', 'w') as f:
         json.dump(payload, f, indent=4)
 
-    update_expiry_history(chain_data)
-    
+    # 4. Standard Logging for Accuracy
     log_path = 'data/history_log.json'
     log = json.load(open(log_path)) if os.path.exists(log_path) else []
     today = datetime.now(SGT).strftime("%Y-%m-%d")
-    
     if log and log[-1]['date'] == today:
         log[-1]['spot'] = payload["spot"]
         log[-1]['btc_spot'] = payload["btc_spot"]
@@ -133,8 +151,7 @@ def run_update():
     with open(log_path, 'w') as f:
         json.dump(log[-60:], f, indent=4)
     
-    print(f"Update Finished (SGT). {len(chain_data)} expiries tracked.")
+    print(f"Update Finished (SGT). {len(strategic_list)} active expiries tracked.")
 
 if __name__ == "__main__":
     run_update()
-
