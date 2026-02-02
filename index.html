@@ -29,12 +29,11 @@
             <div id="last-update" style="font-size: 0.8em; color: #888; margin-left: auto;"></div>
         </div>
         <div id="scoreBox" class="score-box"><h1 id="scoreValue">--</h1><p id="scoreLabel">INITIALIZING...</p></div>
-        
         <div id="chart-wrapper"><canvas id="maxPainChart"></canvas></div>
 
         <div class="section-header">
             <h3>🕒 Historical Evolution Tracker (SGT)</h3>
-            <p style="font-size: 0.85em; color: #888;">Daily snapshots of Max Pain. White vertical lines separate different option expiries.</p>
+            <p style="font-size: 0.85em; color: #888;">Daily Max Pain. <span style="background:white; color:black; padding:2px;">White background</span> indicates future options. Black lines separate groups.</p>
             <div class="scroll-container">
                 <div class="trend-chart-inner"><canvas id="trendChart"></canvas></div>
             </div>
@@ -42,7 +41,7 @@
 
         <div class="section-header">
             <h3>🎯 Expiry Accuracy: Actual Close vs Max Pain</h3>
-            <p style="font-size: 0.85em; color: #888;">Matches actual MSTR close (Yellow Star) vs the final Institutional Magnet.</p>
+            <p style="font-size: 0.85em; color: #888;">MSTR Close (Yellow Star) and BTC Close (Orange Circle) vs Institutional Magnets.</p>
             <div class="accuracy-container"><canvas id="accuracyChart"></canvas></div>
         </div>
     </div>
@@ -54,26 +53,15 @@
     async function loadData() {
         try {
             const [c, h, l] = await Promise.all([
-                fetch('./data/history.json'), 
-                fetch('./data/expiry_history.json'),
-                fetch('./data/history_log.json')
+                fetch('./data/history.json'), fetch('./data/expiry_history.json'), fetch('./data/history_log.json')
             ]);
             const raw = await c.json();
             expiryHistory = await h.json();
             historyLog = await l.json();
-
-            // PROFESSIONAL FILTER: Removes outliers (like $510) to keep axis clean
             const spot = raw.spot;
-            globalPayload = {
-                ...raw,
-                data: raw.data.filter(d => d.mstr_pain > (spot * 0.4) && d.mstr_pain < (spot * 1.6))
-            };
-
+            globalPayload = { ...raw, data: raw.data.filter(d => d.mstr_pain > (spot * 0.4) && d.mstr_pain < (spot * 1.6)) };
             document.getElementById('last-update').innerText = `Last Sync: ${globalPayload.last_update}`;
-            renderMainChart();
-            renderTrendChart();
-            renderAccuracyChart();
-            updateAnalysis();
+            renderMainChart(); renderTrendChart(); renderAccuracyChart(); updateAnalysis();
         } catch (e) { console.error("Data Load Fail:", e); }
     }
 
@@ -98,70 +86,58 @@
                     { type: 'bar', label: 'Puts', data: globalPayload.data.map(d => d.put_oi), backgroundColor: 'rgba(255,68,68,0.1)', yAxisID: 'yV', stack: 'v1', order: 2 }
                 ]
             },
-            options: { 
-                responsive: true, maintainAspectRatio: false, 
-                scales: { 
-                    yP: { position: 'left', beginAtZero: false, grace: '10%', title: { display: true, text: 'MSTR ($)', color: '#00ff88' } }, 
-                    yB: { position: 'right', title: { display: true, text: 'BTC ($)', color: '#3498db' }, grid: { display: false } }, 
-                    // FIXED: Isolated Volume scale prevents price stunting
-                    yV: { display: false, position: 'right', beginAtZero: true, max: 2000000 } 
-                } 
-            }
+            options: { responsive: true, maintainAspectRatio: false, scales: { yP: { position: 'left', beginAtZero: false, grace: '10%' }, yB: { position: 'right', grid: { display: false } }, yV: { display: false, position: 'right', max: 2000000 } } }
         });
     }
 
     function renderTrendChart() {
         const ctx = document.getElementById('trendChart').getContext('2d');
         if (trendChart) trendChart.destroy();
-        
-        const nestedLabels = [], mstr = [], btc = [], cV = [], pV = [];
-        const expiryBoundaries = [];
+        const nestedLabels = [], mstr = [], btc = [], cV = [], pV = [], expiryBoundaries = [];
+        const todayStr = new Date().toISOString().split('T')[0];
         let currentIndex = 0;
 
         Object.keys(expiryHistory).sort().forEach(exp => {
+            const startIdx = currentIndex;
             expiryHistory[exp].forEach((d) => {
-                nestedLabels.push([d.trade_date.slice(5), "EXP: " + exp.slice(5)]);
-                mstr.push(d.mstr_pain);
-                btc.push(d.btc_pain);
-                cV.push(d.call_oi);
-                pV.push(d.put_oi);
+                nestedLabels.push([d.trade_date.slice(5), exp.slice(5)]);
+                mstr.push(d.mstr_pain); btc.push(d.btc_pain);
+                cV.push(d.call_oi); pV.push(d.put_oi);
                 currentIndex++;
             });
-            expiryBoundaries.push(currentIndex - 0.5); // Logic for midpoint divider
+            // Record range and type for background shading
+            expiryBoundaries.push({ 
+                boundary: currentIndex - 0.5, 
+                isFuture: exp >= todayStr,
+                start: startIdx - 0.5,
+                end: currentIndex - 0.5
+            });
+        });
+
+        const annotations = {};
+        expiryBoundaries.forEach((b, i) => {
+            // Dividing line (Black)
+            annotations[`line${i}`] = { type: 'line', xMin: b.boundary, xMax: b.boundary, borderColor: '#000000', borderWidth: 2 };
+            // Background Box (White for future)
+            if (b.isFuture) {
+                annotations[`box${i}`] = { type: 'box', xMin: b.start, xMax: b.end, backgroundColor: 'rgba(255, 255, 255, 1)', drawTime: 'beforeDatasetsDraw' };
+            }
         });
 
         trendChart = new Chart(ctx, {
-            data: {
-                labels: nestedLabels,
-                datasets: [
-                    { type: 'line', label: 'MSTR Pain', data: mstr, borderColor: '#00ff88', yAxisID: 'yP', pointRadius: 2 },
-                    { type: 'line', label: 'BTC Pain', data: btc, borderColor: '#3498db', yAxisID: 'yB', borderDash: [2,2], pointRadius: 0 },
-                    { type: 'bar', label: 'Calls', data: cV, backgroundColor: 'rgba(0,255,136,0.1)', yAxisID: 'yV', stack: 'h' },
-                    { type: 'bar', label: 'Puts', data: pV, backgroundColor: 'rgba(255,68,68,0.1)', yAxisID: 'yV', stack: 'h' }
-                ]
-            },
+            data: { labels: nestedLabels, datasets: [
+                { type: 'line', label: 'MSTR Pain', data: mstr, borderColor: '#00ff88', yAxisID: 'yP', pointRadius: 2 },
+                { type: 'line', label: 'BTC Pain', data: btc, borderColor: '#3498db', yAxisID: 'yB', borderDash: [2,2], pointRadius: 0 },
+                { type: 'bar', label: 'Calls', data: cV, backgroundColor: 'rgba(0,255,136,0.1)', yAxisID: 'yV', stack: 'h' },
+                { type: 'bar', label: 'Puts', data: pV, backgroundColor: 'rgba(255, 68, 68, 0.1)', yAxisID: 'yV', stack: 'h' }
+            ]},
             options: { 
                 responsive: true, maintainAspectRatio: false, 
                 scales: { 
-                    x: { ticks: { font: { size: 9 }, autoSkip: false } }, 
-                    yP: { position: 'left', beginAtZero: false }, 
-                    yB: { position: 'right' }, 
-                    yV: { display: false, position: 'right', stacked: true } 
+                    x: { ticks: { font: { size: 9 }, color: '#444', autoSkip: false } }, 
+                    yP: { position: 'left' }, yB: { position: 'right' }, yV: { display: false, stacked: true } 
                 },
-                plugins: {
-                    annotation: {
-                        annotations: expiryBoundaries.slice(0, -1).reduce((acc, boundary, i) => {
-                            acc[`line${i}`] = {
-                                type: 'line',
-                                xMin: boundary,
-                                xMax: boundary,
-                                borderColor: 'rgba(255, 255, 255, 0.4)',
-                                borderWidth: 1
-                            };
-                            return acc;
-                        }, {})
-                    }
-                }
+                plugins: { annotation: { annotations: annotations } }
             }
         });
     }
@@ -169,40 +145,38 @@
     function renderAccuracyChart() {
         const ctx = document.getElementById('accuracyChart').getContext('2d');
         if (accuracyChart) accuracyChart.destroy();
-        const labs = [], spots = [], pain = [], btc = [], cV = [], pV = [];
+        const labs = [], spots = [], btcSpots = [], pain = [], btcPain = [], cV = [], pV = [];
 
         Object.keys(expiryHistory).sort().forEach(expDate => {
             const cluster = expiryHistory[expDate];
             if (!cluster || cluster.length === 0) return;
             const finalPain = cluster[cluster.length - 1];
-            // Cross-reference logs for Friday close (recorded Saturday morning SGT)
-            const nextDay = new Date(new Date(expDate).getTime() + 86400000).toISOString().split('T')[0];
-            const logEntry = historyLog.find(l => l.date === nextDay) || historyLog.find(l => l.date === expDate);
+            const nextDayStr = new Date(new Date(expDate).getTime() + 86400000).toISOString().split('T')[0];
+            const logEntry = historyLog.find(l => l.date === nextDayStr) || historyLog.find(l => l.date === expDate);
 
             if (logEntry && finalPain && expDate < new Date().toISOString().split('T')[0]) {
                 labs.push(expDate); spots.push(logEntry.spot);
-                pain.push(finalPain.mstr_pain); btc.push(finalPain.btc_pain);
+                btcSpots.push(logEntry.btc_spot || null); // Pull BTC Spot
+                pain.push(finalPain.mstr_pain); btcPain.push(finalPain.btc_pain);
                 cV.push(finalPain.call_oi); pV.push(finalPain.put_oi);
             }
         });
 
         accuracyChart = new Chart(ctx, {
-            data: {
-                labels: labs,
-                datasets: [
-                    { type: 'line', label: 'Actual Close', data: spots, borderColor: '#ffff00', backgroundColor: '#ffff00', showLine: false, pointStyle: 'star', pointRadius: 12, yAxisID: 'yP', order: 0 },
-                    { type: 'line', label: 'MSTR Pain', data: pain, borderColor: '#00ff88', borderWidth: 3, pointRadius: 5, yAxisID: 'yP', order: 1 },
-                    { type: 'line', label: 'BTC Pain', data: btc, borderColor: '#3498db', borderDash: [5,5], yAxisID: 'yB', order: 1 },
-                    { type: 'bar', label: 'Total Calls', data: cV, backgroundColor: 'rgba(0, 255, 136, 0.1)', yAxisID: 'yV', stack: 'oi', order: 2 },
-                    { type: 'bar', label: 'Total Puts', data: pV, backgroundColor: 'rgba(255, 68, 68, 0.1)', yAxisID: 'yV', stack: 'oi', order: 2 }
-                ]
-            },
+            data: { labels: labs, datasets: [
+                { type: 'line', label: 'MSTR Close', data: spots, borderColor: '#ffff00', backgroundColor: '#ffff00', showLine: false, pointStyle: 'star', pointRadius: 12, yAxisID: 'yP', order: 0 },
+                { type: 'line', label: 'BTC Close', data: btcSpots, borderColor: '#ffa500', backgroundColor: '#ffa500', showLine: false, pointStyle: 'circle', pointRadius: 8, yAxisID: 'yB', order: 0 }, // Orange BTC Dots
+                { type: 'line', label: 'MSTR Pain', data: pain, borderColor: '#00ff88', borderWidth: 3, pointRadius: 5, yAxisID: 'yP', order: 1 },
+                { type: 'line', label: 'BTC Pain', data: btcPain, borderColor: '#3498db', borderDash: [5,5], yAxisID: 'yB', order: 1 },
+                { type: 'bar', label: 'Calls', data: cV, backgroundColor: 'rgba(0, 255, 136, 0.1)', yAxisID: 'yV', stack: 'oi', order: 2 },
+                { type: 'bar', label: 'Puts', data: pV, backgroundColor: 'rgba(255, 68, 68, 0.1)', yAxisID: 'yV', stack: 'oi', order: 2 }
+            ]},
             options: { 
                 responsive: true, maintainAspectRatio: false, 
                 scales: { 
-                    yP: { position: 'left', beginAtZero: false, grace: '10%' }, 
-                    yB: { position: 'right', grid: { display: false } }, 
-                    yV: { display: false, position: 'right', stacked: true } 
+                    yP: { position: 'left', title: { display: true, text: 'MSTR Price ($)', color: '#fff' }, beginAtZero: false, grace: '10%' }, 
+                    yB: { position: 'right', title: { display: true, text: 'BTC Price ($)', color: '#3498db' } }, 
+                    yV: { display: false, stacked: true } 
                 },
                 plugins: { legend: { labels: { color: '#fff', usePointStyle: true } } }
             }
