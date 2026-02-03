@@ -16,6 +16,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15   # Added to prevent cancellation during multiple data retries
     steps:
       - uses: actions/checkout@v3
 
