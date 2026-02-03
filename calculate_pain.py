@@ -64,7 +64,7 @@ def update_expiry_history(chain_data, existing_history):
             
             # Skip if yfinance returned zero but we had good data before
             if curr_oi == 0 and prev_oi > 50:
-                print(f"⚠️  Skipping {exp}: yfinance returned 0 OI (previous: {prev_oi})")
+                print(f"⚠️  Skipping {exp}: yfinance returned 0 OI (keeping previous: {prev_oi})")
                 should_skip = True
             
             # Skip if OI dropped by >80% (likely a data glitch)
@@ -84,7 +84,10 @@ def update_expiry_history(chain_data, existing_history):
                 "call_oi": entry['call_oi'],
                 "put_oi": entry['put_oi']
             })
-            print(f"✓ Updated {exp}: Max Pain ${entry['mstr_pain']}, OI: {curr_oi}")
+            if curr_oi > 0:
+                print(f"✓ Updated {exp}: Max Pain ${entry['mstr_pain']}, OI: {curr_oi}")
+            else:
+                print(f"→ Tracking {exp}: Zero OI (waiting for data)")
         
         # Keep last 10 data points
         existing_history[exp] = existing_history[exp][-10:]
@@ -116,7 +119,7 @@ def run_update():
     all_options = mstr.options
     print(f"Fetching {len(all_options)} expiries from yfinance...\n")
     
-    # Fetch current data
+    # Fetch current data - ADD ALL EXPIRIES (even zeros) to track them
     current_chain_data = []
     for i, exp in enumerate(all_options, 1):
         print(f"[{i}/{len(all_options)}] {exp}...", end=" ")
@@ -124,24 +127,18 @@ def run_update():
         
         total_oi = m_call_oi + m_put_oi
         
+        # CHANGED: Always add to current_chain_data, even if zero OI
+        current_chain_data.append({
+            "date": exp,
+            "mstr_pain": round(m_pain, 2) if m_pain else None,
+            "btc_pain": 95000.0,
+            "call_oi": m_call_oi,
+            "put_oi": m_put_oi
+        })
+        
         if m_pain:
-            current_chain_data.append({
-                "date": exp,
-                "mstr_pain": round(m_pain, 2),
-                "btc_pain": 95000.0,
-                "call_oi": m_call_oi,
-                "put_oi": m_put_oi
-            })
             print(f"✓ Pain: ${m_pain:.0f}, OI: {total_oi}")
         elif total_oi > 0:
-            # Has OI but couldn't calculate pain (too few strikes)
-            current_chain_data.append({
-                "date": exp,
-                "mstr_pain": None,
-                "btc_pain": 95000.0,
-                "call_oi": m_call_oi,
-                "put_oi": m_put_oi
-            })
             print(f"⚠️  Has OI ({total_oi}) but no calculable pain")
         else:
             print(f"✗ Zero OI returned")
@@ -174,19 +171,29 @@ def run_update():
         
         latest = full_history[exp_date][-1]
         mstr_pain_value = latest["mstr_pain"]
+        total_oi = latest["call_oi"] + latest["put_oi"]
+        
+        # Skip expiries with zero OI AND no historical max pain
+        if total_oi == 0 and mstr_pain_value is None:
+            print(f"⊘ Skipping {exp_date}: No data available yet")
+            continue
         
         # If no max pain, try to find historical value
         if mstr_pain_value is None:
             for historical_entry in reversed(full_history[exp_date]):
                 if historical_entry["mstr_pain"] is not None:
                     mstr_pain_value = historical_entry["mstr_pain"]
-                    print(f"Using historical pain for {exp_date}: ${mstr_pain_value}")
+                    print(f"↻ Using historical pain for {exp_date}: ${mstr_pain_value}")
                     break
             
-            # Last resort: use spot
-            if mstr_pain_value is None:
+            # Last resort: estimate from spot (only if we have OI data)
+            if mstr_pain_value is None and total_oi > 0:
                 mstr_pain_value = round(mstr_spot, 2)
-                print(f"Using spot as fallback for {exp_date}: ${mstr_pain_value}")
+                print(f"≈ Using spot as fallback for {exp_date}: ${mstr_pain_value}")
+        
+        # Final check: must have a max pain value
+        if mstr_pain_value is None:
+            continue
         
         # Sanity check on price range
         if mstr_pain_value > (mstr_spot * 0.4) and mstr_pain_value < (mstr_spot * 1.8):
@@ -226,8 +233,9 @@ def run_update():
     print(f"✓ Update Complete!")
     print(f"  - {len(strategic_list)} expiries in final chart")
     print(f"  - {len(full_history)} expiries tracked in history")
-    print(f"  - Payload saved to data/history.json")
+    print(f"  - Data saved to data/history.json")
     print("=" * 80)
 
 if __name__ == "__main__":
     run_update()
+
