@@ -1,4 +1,4 @@
-    import os
+import os
 import json
 import requests
 import time
@@ -165,3 +165,4 @@ def run_update():
 
 if __name__ == "__main__":
     run_update()
+
