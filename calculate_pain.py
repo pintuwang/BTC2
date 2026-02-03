@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 SGT = timezone(timedelta(hours=8))
 
 def calculate_max_pain(ticker_obj, expiry_date):
-    """Calculates Max Pain strike and total Open Interest with Restries."""
+    """Calculates Max Pain strike and total Open Interest with Retries."""
     for attempt in range(3):
         try:
             chain = ticker_obj.option_chain(expiry_date)
@@ -18,8 +18,8 @@ def calculate_max_pain(ticker_obj, expiry_date):
             total_put_oi = int(chain.puts['openInterest'].sum())
             total_oi = total_call_oi + total_put_oi
 
-            # RESTORED: Relaxed Liquidity Guard (200) to capture early-week weeklies
-            if total_oi < 200 and attempt < 2:
+            # LIQUIDITY GUARD: Rejects obvious glitches where data is missing
+            if total_oi < 1000 and attempt < 2:
                 time.sleep(2)
                 continue
 
@@ -64,12 +64,12 @@ def update_expiry_history(chain_data):
         exp = entry['date']
         if exp not in history: history[exp] = []
         
-        # QUALITY CHECK: Don't save if current OI is < 10% of yesterday (Clear Glitch)
+        # QUALITY CHECK: Don't save if current volume is a tiny fraction of yesterday
         if history[exp]:
             prev = history[exp][-1]
             prev_oi = prev['call_oi'] + prev['put_oi']
             curr_oi = entry['call_oi'] + entry['put_oi']
-            if curr_oi < (prev_oi * 0.1) and prev_oi > 2000:
+            if curr_oi < (prev_oi * 0.2) and prev_oi > 5000:
                 continue
 
         if not history[exp] or history[exp][-1]['trade_date'] != today_sgt:
@@ -77,7 +77,7 @@ def update_expiry_history(chain_data):
                 "trade_date": today_sgt, "mstr_pain": entry['mstr_pain'],
                 "btc_pain": entry['btc_pain'], "call_oi": entry['call_oi'], "put_oi": entry['put_oi']
             })
-        history[exp] = history[exp][-15:]
+        history[exp] = history[exp][-10:]
 
     cutoff = (datetime.now(SGT) - timedelta(days=180)).strftime("%Y-%m-%d")
     return {k: v for k, v in history.items() if k >= cutoff}
@@ -92,33 +92,35 @@ def run_update():
     except:
         mstr_spot, btc_spot = 150.0, 75000.0
 
-    btc_dict = get_btc_expiry_pains() # Restored dynamic BTC map
+    btc_dict = get_btc_expiry_pains()
     all_options = mstr.options
     
+    # 1. Fetch live data
     current_chain_data = []
     for exp in all_options:
         m_pain, m_call_oi, m_put_oi = calculate_max_pain(mstr, exp)
         if m_pain:
             current_chain_data.append({
                 "date": exp, "mstr_pain": round(m_pain, 2),
-                "btc_pain": btc_dict.get(exp, 95000.0), # RESTORED: Dynamic mapping
+                "btc_pain": btc_dict.get(exp, 95000.0),
                 "call_oi": m_call_oi, "put_oi": m_put_oi
             })
 
+    # 2. Update permanent archive
     full_history = update_expiry_history(current_chain_data)
     os.makedirs('data', exist_ok=True)
     with open('data/expiry_history.json', 'w') as f:
         json.dump(full_history, f, indent=4)
 
-    # RECONSTRUCT CHART 1: Fill gaps using Persistence from History
+    # 3. RESTORED PERSISTENCE: Build Chart 1 from Archive to fill gaps
     strategic_list = []
     today_str = datetime.now(SGT).strftime("%Y-%m-%d")
     for exp_date in sorted(full_history.keys()):
         if exp_date < today_str: continue
         latest = full_history[exp_date][-1]
         
-        # RESTORED: Sanity check allows broader price range for visibility
-        if latest["mstr_pain"] > (mstr_spot * 0.3) and latest["mstr_pain"] < (mstr_spot * 2.5):
+        # SANITY CHECK: Only show expiries with logical price ranges
+        if latest["mstr_pain"] > (mstr_spot * 0.4) and latest["mstr_pain"] < (mstr_spot * 1.8):
             strategic_list.append({
                 "date": exp_date, "mstr_pain": latest["mstr_pain"], "btc_pain": latest["btc_pain"],
                 "call_oi": latest["call_oi"], "put_oi": latest["put_oi"],
@@ -132,6 +134,7 @@ def run_update():
     with open('data/history.json', 'w') as f:
         json.dump(payload, f, indent=4)
 
+    # 4. Standard Logging
     log_path = 'data/history_log.json'
     log = json.load(open(log_path)) if os.path.exists(log_path) else []
     today = datetime.now(SGT).strftime("%Y-%m-%d")
