@@ -18,7 +18,7 @@ def calculate_max_pain(ticker_obj, expiry_date):
             total_put_oi = int(chain.puts['openInterest'].sum())
             total_oi = total_call_oi + total_put_oi
 
-            # MODIFIED: Only retry if OI is ZERO (clear fetch failure)
+            # Only retry if OI is ZERO (clear fetch failure)
             if total_oi == 0 and attempt < 2:
                 time.sleep(2)
                 continue
@@ -28,7 +28,7 @@ def calculate_max_pain(ticker_obj, expiry_date):
             
             strikes = sorted(set(calls['strike']).union(set(puts['strike'])))
             if not strikes: 
-                # MODIFIED: Return OI data even if no strikes found for debugging
+                # Return OI even if max pain can't be calculated
                 return None, total_call_oi, total_put_oi
             
             pain_results = []
@@ -40,7 +40,7 @@ def calculate_max_pain(ticker_obj, expiry_date):
             max_p = float(pd.DataFrame(pain_results).sort_values('total').iloc[0]['strike'])
             return max_p, total_call_oi, total_put_oi
         except Exception as e:
-            if attempt == 2:  # Log on final failure
+            if attempt == 2:
                 print(f"Failed to fetch {expiry_date}: {e}")
             time.sleep(2)
     return None, 0, 0
@@ -55,7 +55,7 @@ def update_expiry_history(chain_data):
         exp = entry['date']
         if exp not in history: history[exp] = []
         
-        # MODIFIED: More lenient quality check - only block obvious zeros
+        # More lenient quality check - only block obvious zeros
         should_skip = False
         if history[exp]:
             prev = history[exp][-1]
@@ -92,13 +92,23 @@ def run_update():
 
     all_options = mstr.options
     current_chain_data = []
+    
+    # CRITICAL FIX: Save ALL expiries with any OI data, not just those with calculable max pain
     for exp in all_options:
         m_pain, m_call_oi, m_put_oi = calculate_max_pain(mstr, exp)
-        if m_pain:
+        
+        # Changed condition: Save if there's ANY open interest
+        if m_call_oi > 0 or m_put_oi > 0:
+            # Use previous max pain if current calculation failed
             current_chain_data.append({
-                "date": exp, "mstr_pain": round(m_pain, 2),
-                "btc_pain": 95000.0, "call_oi": m_call_oi, "put_oi": m_put_oi
+                "date": exp, 
+                "mstr_pain": round(m_pain, 2) if m_pain else None,
+                "btc_pain": 95000.0, 
+                "call_oi": m_call_oi, 
+                "put_oi": m_put_oi
             })
+            if m_pain is None:
+                print(f"Warning: {exp} has OI ({m_call_oi + m_put_oi}) but no calculable max pain")
 
     full_history = update_expiry_history(current_chain_data)
     os.makedirs('data', exist_ok=True)
@@ -108,21 +118,46 @@ def run_update():
     # RECONSTRUCT CHART 1: Fill gaps using Persistence from History
     strategic_list = []
     today_str = datetime.now(SGT).strftime("%Y-%m-%d")
+    
     for exp_date in sorted(full_history.keys()):
-        if exp_date < today_str: continue
-        latest = full_history[exp_date][-1] # Pull the last known good data point
+        if exp_date < today_str: 
+            continue
+        
+        latest = full_history[exp_date][-1]
+        
+        # Use historical max pain if current is None
+        mstr_pain_value = latest["mstr_pain"]
+        
+        # If no max pain available at all, estimate from spot
+        if mstr_pain_value is None:
+            # Look back through history for last valid max pain
+            for historical_entry in reversed(full_history[exp_date]):
+                if historical_entry["mstr_pain"] is not None:
+                    mstr_pain_value = historical_entry["mstr_pain"]
+                    print(f"Using historical max pain for {exp_date}: {mstr_pain_value}")
+                    break
+            
+            # If still no max pain found, use spot as fallback
+            if mstr_pain_value is None:
+                mstr_pain_value = round(mstr_spot, 2)
+                print(f"Using spot price as fallback for {exp_date}: {mstr_pain_value}")
         
         # SANITY CHECK: Only show expiries with logical price ranges
-        if latest["mstr_pain"] > (mstr_spot * 0.4) and latest["mstr_pain"] < (mstr_spot * 1.8):
+        if mstr_pain_value > (mstr_spot * 0.4) and mstr_pain_value < (mstr_spot * 1.8):
             strategic_list.append({
-                "date": exp_date, "mstr_pain": latest["mstr_pain"], "btc_pain": latest["btc_pain"],
-                "call_oi": latest["call_oi"], "put_oi": latest["put_oi"],
+                "date": exp_date, 
+                "mstr_pain": mstr_pain_value, 
+                "btc_pain": latest["btc_pain"],
+                "call_oi": latest["call_oi"], 
+                "put_oi": latest["put_oi"],
                 "is_monthly": (15 <= int(exp_date.split('-')[2]) <= 21)
             })
 
     payload = {
         "last_update": datetime.now(SGT).strftime("%Y-%m-%d %H:%M"),
-        "spot": round(mstr_spot, 2), "btc_spot": round(btc_spot, 2), "data": strategic_list
+        "spot": round(mstr_spot, 2), 
+        "btc_spot": round(btc_spot, 2), 
+        "data": strategic_list
     }
     with open('data/history.json', 'w') as f:
         json.dump(payload, f, indent=4)
@@ -137,7 +172,7 @@ def run_update():
     with open(log_path, 'w') as f:
         json.dump(log[-60:], f, indent=4)
     
-    print(f"Update Finished. {len(strategic_list)} valid expiries recorded.")
+    print(f"Update Finished. {len(strategic_list)} valid expiries recorded from {len(all_options)} total.")
 
 if __name__ == "__main__":
     run_update()
