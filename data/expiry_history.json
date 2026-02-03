@@ -542,13 +542,6 @@
     ],
     "2026-04-17": [
         {
-            "trade_date": "2026-01-22",
-            "mstr_pain": 200.0,
-            "btc_pain": 95000.0,
-            "call_oi": 44336,
-            "put_oi": 30937
-        },
-        {
             "trade_date": "2026-01-23",
             "mstr_pain": 200.0,
             "btc_pain": 95000.0,
@@ -610,6 +603,13 @@
             "btc_pain": 95000.0,
             "call_oi": 8566,
             "put_oi": 8382
+        },
+        {
+            "trade_date": "2026-02-03",
+            "mstr_pain": null,
+            "btc_pain": 95000.0,
+            "call_oi": 4,
+            "put_oi": 1
         }
     ],
     "2026-05-15": [
