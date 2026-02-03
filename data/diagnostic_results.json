@@ -1,0 +1,162 @@
+[
+    {
+        "expiry": "2026-02-06",
+        "max_pain": null,
+        "call_oi": 0,
+        "put_oi": 0,
+        "total_oi": 0,
+        "status": "FAILED"
+    },
+    {
+        "expiry": "2026-02-13",
+        "max_pain": null,
+        "call_oi": 0,
+        "put_oi": 0,
+        "total_oi": 0,
+        "status": "FAILED"
+    },
+    {
+        "expiry": "2026-02-20",
+        "max_pain": 480.0,
+        "call_oi": 620,
+        "put_oi": 14,
+        "total_oi": 634,
+        "status": "OK"
+    },
+    {
+        "expiry": "2026-02-27",
+        "max_pain": null,
+        "call_oi": 0,
+        "put_oi": 0,
+        "total_oi": 0,
+        "status": "FAILED"
+    },
+    {
+        "expiry": "2026-03-06",
+        "max_pain": null,
+        "call_oi": 0,
+        "put_oi": 0,
+        "total_oi": 0,
+        "status": "FAILED"
+    },
+    {
+        "expiry": "2026-03-13",
+        "max_pain": null,
+        "call_oi": 0,
+        "put_oi": 0,
+        "total_oi": 0,
+        "status": "FAILED"
+    },
+    {
+        "expiry": "2026-03-20",
+        "max_pain": 510.0,
+        "call_oi": 7,
+        "put_oi": 36,
+        "total_oi": 43,
+        "status": "OK"
+    },
+    {
+        "expiry": "2026-04-17",
+        "max_pain": null,
+        "call_oi": 4,
+        "put_oi": 1,
+        "total_oi": 5,
+        "status": "NO_STRIKES"
+    },
+    {
+        "expiry": "2026-05-15",
+        "max_pain": 365.0,
+        "call_oi": 140,
+        "put_oi": 127,
+        "total_oi": 267,
+        "status": "OK"
+    },
+    {
+        "expiry": "2026-06-18",
+        "max_pain": 117.0,
+        "call_oi": 6240,
+        "put_oi": 1741,
+        "total_oi": 7981,
+        "status": "OK"
+    },
+    {
+        "expiry": "2026-07-17",
+        "max_pain": 215.0,
+        "call_oi": 0,
+        "put_oi": 71,
+        "total_oi": 71,
+        "status": "OK"
+    },
+    {
+        "expiry": "2026-08-21",
+        "max_pain": 410.0,
+        "call_oi": 12,
+        "put_oi": 101,
+        "total_oi": 113,
+        "status": "OK"
+    },
+    {
+        "expiry": "2026-09-18",
+        "max_pain": 490.0,
+        "call_oi": 213,
+        "put_oi": 325,
+        "total_oi": 538,
+        "status": "OK"
+    },
+    {
+        "expiry": "2026-12-18",
+        "max_pain": 840.0,
+        "call_oi": 57,
+        "put_oi": 231,
+        "total_oi": 288,
+        "status": "OK"
+    },
+    {
+        "expiry": "2027-01-15",
+        "max_pain": 1030.0,
+        "call_oi": 70,
+        "put_oi": 827,
+        "total_oi": 897,
+        "status": "OK"
+    },
+    {
+        "expiry": "2027-06-17",
+        "max_pain": 500.0,
+        "call_oi": 419,
+        "put_oi": 584,
+        "total_oi": 1003,
+        "status": "OK"
+    },
+    {
+        "expiry": "2027-09-17",
+        "max_pain": 560.0,
+        "call_oi": 4,
+        "put_oi": 339,
+        "total_oi": 343,
+        "status": "OK"
+    },
+    {
+        "expiry": "2027-12-17",
+        "max_pain": 650.0,
+        "call_oi": 218,
+        "put_oi": 667,
+        "total_oi": 885,
+        "status": "OK"
+    },
+    {
+        "expiry": "2028-01-21",
+        "max_pain": 680.0,
+        "call_oi": 30,
+        "put_oi": 410,
+        "total_oi": 440,
+        "status": "OK"
+    },
+    {
+        "expiry": "2028-06-16",
+        "max_pain": null,
+        "call_oi": 0,
+        "put_oi": 0,
+        "total_oi": 0,
+        "status": "FAILED"
+    }
+]
