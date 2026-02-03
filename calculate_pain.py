@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 SGT = timezone(timedelta(hours=8))
 
 def calculate_max_pain(ticker_obj, expiry_date):
-    """Calculates Max Pain strike and total Open Interest with Retries."""
+    """Calculates Max Pain strike and total Open Interest with strict validation."""
     for attempt in range(3):
         try:
             chain = ticker_obj.option_chain(expiry_date)
@@ -18,7 +18,7 @@ def calculate_max_pain(ticker_obj, expiry_date):
             total_put_oi = int(chain.puts['openInterest'].sum())
             total_oi = total_call_oi + total_put_oi
 
-            # LIQUIDITY GUARD: Rejects obvious glitches where data is missing
+            # LIQUIDITY GUARD: Rejects obvious glitches
             if total_oi < 1000 and attempt < 2:
                 time.sleep(2)
                 continue
@@ -55,7 +55,7 @@ def get_btc_expiry_pains():
     except: return {}
 
 def update_expiry_history(chain_data):
-    """Maintains data and prevents overwriting good data with glitches."""
+    """Prevents overwriting good data with glitches using Persistence."""
     path = 'data/expiry_history.json'
     history = json.load(open(path)) if os.path.exists(path) else {}
     today_sgt = datetime.now(SGT).strftime("%Y-%m-%d")
@@ -64,7 +64,7 @@ def update_expiry_history(chain_data):
         exp = entry['date']
         if exp not in history: history[exp] = []
         
-        # QUALITY CHECK: Don't save if current volume is a tiny fraction of yesterday
+        # QUALITY CHECK: Reject data if volume drops by >80% suddenly
         if history[exp]:
             prev = history[exp][-1]
             prev_oi = prev['call_oi'] + prev['put_oi']
@@ -95,7 +95,6 @@ def run_update():
     btc_dict = get_btc_expiry_pains()
     all_options = mstr.options
     
-    # 1. Fetch live data
     current_chain_data = []
     for exp in all_options:
         m_pain, m_call_oi, m_put_oi = calculate_max_pain(mstr, exp)
@@ -106,18 +105,17 @@ def run_update():
                 "call_oi": m_call_oi, "put_oi": m_put_oi
             })
 
-    # 2. Update permanent archive
     full_history = update_expiry_history(current_chain_data)
     os.makedirs('data', exist_ok=True)
     with open('data/expiry_history.json', 'w') as f:
         json.dump(full_history, f, indent=4)
 
-    # 3. RESTORED PERSISTENCE: Build Chart 1 from Archive to fill gaps
+    # RESTORED PERSISTENCE: Pull Chart 1 from Archive to fill gaps
     strategic_list = []
     today_str = datetime.now(SGT).strftime("%Y-%m-%d")
     for exp_date in sorted(full_history.keys()):
         if exp_date < today_str: continue
-        latest = full_history[exp_date][-1]
+        latest = full_history[exp_date][-1] # Pull the last known good data point
         
         # SANITY CHECK: Only show expiries with logical price ranges
         if latest["mstr_pain"] > (mstr_spot * 0.4) and latest["mstr_pain"] < (mstr_spot * 1.8):
@@ -134,7 +132,6 @@ def run_update():
     with open('data/history.json', 'w') as f:
         json.dump(payload, f, indent=4)
 
-    # 4. Standard Logging
     log_path = 'data/history_log.json'
     log = json.load(open(log_path)) if os.path.exists(log_path) else []
     today = datetime.now(SGT).strftime("%Y-%m-%d")
@@ -145,7 +142,7 @@ def run_update():
     with open(log_path, 'w') as f:
         json.dump(log[-60:], f, indent=4)
     
-    print(f"Sync Complete. {len(strategic_list)} valid expiries recorded.")
+    print(f"Update Finished. {len(strategic_list)} valid expiries recorded.")
 
 if __name__ == "__main__":
     run_update()
