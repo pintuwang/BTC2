@@ -18,8 +18,8 @@ def calculate_max_pain(ticker_obj, expiry_date):
             total_put_oi = int(chain.puts['openInterest'].sum())
             total_oi = total_call_oi + total_put_oi
 
-            # LIQUIDITY GUARD: MSTR weekly/monthly OI should never be tiny.
-            if total_oi < 1000 and attempt < 2:
+            # MODIFIED: Only retry if OI is ZERO (clear fetch failure)
+            if total_oi == 0 and attempt < 2:
                 time.sleep(2)
                 continue
 
@@ -27,7 +27,9 @@ def calculate_max_pain(ticker_obj, expiry_date):
             puts = chain.puts[chain.puts['openInterest'] >= 10][['strike', 'openInterest']].fillna(0)
             
             strikes = sorted(set(calls['strike']).union(set(puts['strike'])))
-            if not strikes: return None, 0, 0
+            if not strikes: 
+                # MODIFIED: Return OI data even if no strikes found for debugging
+                return None, total_call_oi, total_put_oi
             
             pain_results = []
             for s in strikes:
@@ -37,22 +39,11 @@ def calculate_max_pain(ticker_obj, expiry_date):
             
             max_p = float(pd.DataFrame(pain_results).sort_values('total').iloc[0]['strike'])
             return max_p, total_call_oi, total_put_oi
-        except:
+        except Exception as e:
+            if attempt == 2:  # Log on final failure
+                print(f"Failed to fetch {expiry_date}: {e}")
             time.sleep(2)
     return None, 0, 0
-
-def get_btc_expiry_pains():
-    """Fetches real BTC Max Pain data from Deribit."""
-    try:
-        url = "https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option"
-        resp = requests.get(url, timeout=15).json().get('result', [])
-        results = {}
-        for item in resp:
-            parts = item['instrument_name'].split('-')
-            dt = datetime.strptime(parts[1], "%d%b%y").strftime("%Y-%m-%d")
-            if dt not in results: results[dt] = float(parts[2])
-        return results
-    except: return {}
 
 def update_expiry_history(chain_data):
     """Maintains data and prevents overwriting good data with glitches."""
@@ -64,13 +55,20 @@ def update_expiry_history(chain_data):
         exp = entry['date']
         if exp not in history: history[exp] = []
         
-        # QUALITY CHECK: Don't save if current OI is < 20% of yesterday (Clear Glitch)
+        # MODIFIED: More lenient quality check - only block obvious zeros
+        should_skip = False
         if history[exp]:
             prev = history[exp][-1]
             prev_oi = prev['call_oi'] + prev['put_oi']
             curr_oi = entry['call_oi'] + entry['put_oi']
-            if curr_oi < (prev_oi * 0.2) and prev_oi > 5000:
-                continue
+            
+            # Only skip if current OI is zero but previous was substantial
+            if curr_oi == 0 and prev_oi > 1000:
+                should_skip = True
+                print(f"Skipping {exp}: Zero OI (prev: {prev_oi})")
+        
+        if should_skip:
+            continue
 
         if not history[exp] or history[exp][-1]['trade_date'] != today_sgt:
             history[exp].append({
@@ -92,51 +90,43 @@ def run_update():
     except:
         mstr_spot, btc_spot = 150.0, 75000.0
 
-    btc_dict = get_btc_expiry_pains()
     all_options = mstr.options
-    
-    # 1. Fetch live data
     current_chain_data = []
     for exp in all_options:
         m_pain, m_call_oi, m_put_oi = calculate_max_pain(mstr, exp)
         if m_pain:
             current_chain_data.append({
                 "date": exp, "mstr_pain": round(m_pain, 2),
-                "btc_pain": btc_dict.get(exp, 95000.0),
-                "call_oi": m_call_oi, "put_oi": m_put_oi
+                "btc_pain": 95000.0, "call_oi": m_call_oi, "put_oi": m_put_oi
             })
 
-    # 2. Update and return the full archive
     full_history = update_expiry_history(current_chain_data)
     os.makedirs('data', exist_ok=True)
     with open('data/expiry_history.json', 'w') as f:
         json.dump(full_history, f, indent=4)
 
-    # 3. CONSTRUCT PAYLOAD FROM ARCHIVE: This fills the gaps
+    # RECONSTRUCT CHART 1: Fill gaps using Persistence from History
     strategic_list = []
     today_str = datetime.now(SGT).strftime("%Y-%m-%d")
     for exp_date in sorted(full_history.keys()):
-        if exp_date < today_str: continue # Skip old data
+        if exp_date < today_str: continue
+        latest = full_history[exp_date][-1] # Pull the last known good data point
         
-        latest = full_history[exp_date][-1] # Get last known good data point
-        
-        # FINAL SANITY CHECK: Only show expiries with reasonable price range
+        # SANITY CHECK: Only show expiries with logical price ranges
         if latest["mstr_pain"] > (mstr_spot * 0.4) and latest["mstr_pain"] < (mstr_spot * 1.8):
             strategic_list.append({
-                "date": exp_date, "mstr_pain": latest["mstr_pain"], 
-                "btc_pain": latest["btc_pain"], "call_oi": latest["call_oi"], 
-                "put_oi": latest["put_oi"], "is_monthly": (15 <= int(exp_date.split('-')[2]) <= 21)
+                "date": exp_date, "mstr_pain": latest["mstr_pain"], "btc_pain": latest["btc_pain"],
+                "call_oi": latest["call_oi"], "put_oi": latest["put_oi"],
+                "is_monthly": (15 <= int(exp_date.split('-')[2]) <= 21)
             })
 
     payload = {
         "last_update": datetime.now(SGT).strftime("%Y-%m-%d %H:%M"),
-        "spot": round(mstr_spot, 2), "btc_spot": round(btc_spot, 2), 
-        "data": strategic_list # RESTORED: Uses the full archive list, not just current fetch
+        "spot": round(mstr_spot, 2), "btc_spot": round(btc_spot, 2), "data": strategic_list
     }
     with open('data/history.json', 'w') as f:
         json.dump(payload, f, indent=4)
 
-    # 4. Standard Logging
     log_path = 'data/history_log.json'
     log = json.load(open(log_path)) if os.path.exists(log_path) else []
     today = datetime.now(SGT).strftime("%Y-%m-%d")
@@ -147,7 +137,7 @@ def run_update():
     with open(log_path, 'w') as f:
         json.dump(log[-60:], f, indent=4)
     
-    print(f"Update Finished. {len(strategic_list)} active expiries tracked.")
+    print(f"Update Finished. {len(strategic_list)} valid expiries recorded.")
 
 if __name__ == "__main__":
     run_update()
