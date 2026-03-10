@@ -44,16 +44,54 @@ def calculate_max_pain(ticker_obj, expiry_date):
     return None, 0, 0
 
 def get_btc_expiry_pains():
-    """Fetches real BTC Max Pain data from Deribit."""
+    """Fetches BTC option OI from Deribit and calculates true Max Pain per expiry."""
     try:
         url = "https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option"
         resp = requests.get(url, timeout=15).json().get('result', [])
-        results = {}
+
+        # Group OI by expiry → strike → {call_oi, put_oi}
+        expiry_data = {}
         for item in resp:
             parts = item['instrument_name'].split('-')
+            if len(parts) != 4:
+                continue
             dt = datetime.strptime(parts[1], "%d%b%y").strftime("%Y-%m-%d")
-            if dt not in results:
-                results[dt] = float(parts[2])
+            strike = float(parts[2])
+            opt_type = parts[3]  # 'C' or 'P'
+            oi = item.get('open_interest', 0) or 0
+
+            if dt not in expiry_data:
+                expiry_data[dt] = {}
+            if strike not in expiry_data[dt]:
+                expiry_data[dt][strike] = {'call_oi': 0, 'put_oi': 0}
+
+            if opt_type == 'C':
+                expiry_data[dt][strike]['call_oi'] += oi
+            elif opt_type == 'P':
+                expiry_data[dt][strike]['put_oi'] += oi
+
+        # Calculate max pain for each expiry
+        results = {}
+        for dt, strikes_dict in expiry_data.items():
+            strikes = sorted(strikes_dict.keys())
+            if not strikes:
+                continue
+            best_strike = None
+            best_pain = float('inf')
+            for s in strikes:
+                call_pain = sum(
+                    (s - k) * v['call_oi'] for k, v in strikes_dict.items() if k < s
+                )
+                put_pain = sum(
+                    (k - s) * v['put_oi'] for k, v in strikes_dict.items() if k > s
+                )
+                total = call_pain + put_pain
+                if total < best_pain:
+                    best_pain = total
+                    best_strike = s
+            if best_strike is not None:
+                results[dt] = best_strike
+
         return results
     except:
         return {}
@@ -123,7 +161,7 @@ def run_update():
             chain_data.append({
                 "date": exp,
                 "mstr_pain": round(m_pain, 2),
-                "btc_pain": btc_dict.get(exp, 95000.0),
+                "btc_pain": btc_dict.get(exp, None),
                 "call_oi": m_call_oi,
                 "put_oi": m_put_oi,
                 "is_monthly": (15 <= int(exp.split('-')[2]) <= 21)
