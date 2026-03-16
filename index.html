@@ -56,8 +56,10 @@
 
     async function loadData() {
         try {
+            // Cache-busting: append timestamp so GitHub Pages always serves fresh JSON
+            const cb = '?v=' + Date.now();
             const [c, h, l] = await Promise.all([
-                fetch('./data/history.json'), fetch('./data/expiry_history.json'), fetch('./data/history_log.json')
+                fetch('./data/history.json' + cb), fetch('./data/expiry_history.json' + cb), fetch('./data/history_log.json' + cb)
             ]);
             globalPayload = await c.json();
             expiryHistory = await h.json();
@@ -84,7 +86,7 @@
                 labels: globalPayload.data.map(d => d.date),
                 datasets: [
                     { type: 'line', label: 'MSTR Pain', data: globalPayload.data.map(d => d.mstr_pain), borderColor: '#00ff88', borderWidth: 3, yAxisID: 'yP', tension: 0.3 },
-                    { type: 'line', label: 'BTC Pain', data: globalPayload.data.map(d => d.btc_pain), borderColor: '#3498db', yAxisID: 'yB', borderDash: [5,5] },
+                    { type: 'line', label: 'BTC Pain', data: globalPayload.data.map(d => d.btc_pain), borderColor: '#3498db', yAxisID: 'yB', borderDash: [5,5], spanGaps: true },
                     { type: 'bar', label: 'Calls', data: globalPayload.data.map(d => d.call_oi), backgroundColor: NEON_GREEN, yAxisID: 'yV', stack: 'v1' },
                     { type: 'bar', label: 'Puts', data: globalPayload.data.map(d => d.put_oi), backgroundColor: NEON_PINK, yAxisID: 'yV', stack: 'v1' }
                 ]
@@ -94,7 +96,7 @@
                 scales: { 
                     x: { ticks: { color: YELLOW } },
                     yP: { position: 'left', beginAtZero: false, grace: '10%', ticks: { color: YELLOW } }, 
-                    yB: { position: 'right', grid: { display: false }, ticks: { color: YELLOW } }, 
+                    yB: { position: 'right', grid: { display: false }, beginAtZero: false, grace: '10%', ticks: { color: YELLOW } }, 
                     yV: { display: false, position: 'right', beginAtZero: true, max: 2000000, ticks: { color: YELLOW } } 
                 } 
             }
@@ -130,7 +132,7 @@
         trendChart = new Chart(ctx, {
             data: { labels: nestedLabels, datasets: [
                 { type: 'line', label: 'MSTR Pain', data: mstr, borderColor: '#00ff88', yAxisID: 'yP', pointRadius: 2 },
-                { type: 'line', label: 'BTC Pain', data: btc, borderColor: '#3498db', yAxisID: 'yB', borderDash: [2,2], pointRadius: 0 },
+                { type: 'line', label: 'BTC Pain', data: btc, borderColor: '#3498db', yAxisID: 'yB', borderDash: [2,2], pointRadius: 0, spanGaps: true },
                 { type: 'bar', label: 'Calls', data: cV, backgroundColor: NEON_GREEN, yAxisID: 'yV', stack: 'h' },
                 { type: 'bar', label: 'Puts', data: pV, backgroundColor: NEON_PINK, yAxisID: 'yV', stack: 'h' }
             ]},
@@ -139,7 +141,7 @@
                 scales: { 
                     x: { ticks: { font: { size: 9 }, color: YELLOW, autoSkip: false } }, 
                     yP: { position: 'left', ticks: { color: YELLOW } }, 
-                    yB: { position: 'right', ticks: { color: YELLOW } }, 
+                    yB: { position: 'right', beginAtZero: false, grace: '10%', ticks: { color: YELLOW } }, 
                     yV: { display: false, position: 'right', stacked: true, ticks: { color: YELLOW } } 
                 },
                 plugins: { annotation: { annotations: annotations } }
@@ -172,7 +174,7 @@
                 { type: 'line', label: 'MSTR Close', data: spots, borderColor: '#ffff00', backgroundColor: '#ffff00', showLine: false, pointStyle: 'star', pointRadius: 12, yAxisID: 'yP', order: 0 },
                 { type: 'line', label: 'BTC Close', data: btcSpots, borderColor: '#ffa500', backgroundColor: '#ffa500', showLine: false, pointStyle: 'circle', pointRadius: 8, yAxisID: 'yB', order: 0 },
                 { type: 'line', label: 'MSTR Pain', data: pain, borderColor: '#00ff88', borderWidth: 3, pointRadius: 5, yAxisID: 'yP', order: 1 },
-                { type: 'line', label: 'BTC Pain', data: btcPain, borderColor: '#3498db', borderDash: [5,5], yAxisID: 'yB', order: 1 },
+                { type: 'line', label: 'BTC Pain', data: btcPain, borderColor: '#3498db', borderDash: [5,5], yAxisID: 'yB', order: 1, spanGaps: true },
                 { type: 'bar', label: 'Total Calls', data: cV, backgroundColor: NEON_GREEN, yAxisID: 'yV', stack: 'oi', order: 2 },
                 { type: 'bar', label: 'Total Puts', data: pV, backgroundColor: NEON_PINK, yAxisID: 'yV', stack: 'oi', order: 2 }
             ]},
@@ -181,7 +183,7 @@
                 scales: { 
                     x: { ticks: { color: YELLOW } },
                     yP: { position: 'left', title: { display: true, text: 'MSTR Price ($)', color: YELLOW }, beginAtZero: false, grace: '10%', ticks: { color: YELLOW } }, 
-                    yB: { position: 'right', title: { display: true, text: 'BTC Price ($)', color: YELLOW }, ticks: { color: YELLOW } }, 
+                    yB: { position: 'right', title: { display: true, text: 'BTC Price ($)', color: YELLOW }, beginAtZero: false, grace: '10%', ticks: { color: YELLOW } }, 
                     yV: { display: false, position: 'right', stacked: true, ticks: { color: YELLOW } } 
                 },
                 plugins: { legend: { labels: { color: YELLOW, usePointStyle: true } } }
