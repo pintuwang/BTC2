@@ -43,11 +43,43 @@ def calculate_max_pain(ticker_obj, expiry_date):
                 time.sleep(2)
     return None, 0, 0
 
+def find_nearest_btc_pain(btc_dict, target_date_str, max_days=14):
+    """
+    Finds the nearest BTC expiry pain within max_days of target_date_str.
+    Uses ±14 days to bridge the gap between MSTR 3rd-Friday expiries and
+    Deribit's last-Friday monthly expiries (e.g. MSTR Jul-17 → Deribit Jul-31).
+    Returns (pain_value, matched_date) or (None, None) if no match found.
+    """
+    try:
+        target = datetime.strptime(target_date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return None, None
+
+    best_pain = None
+    best_date = None
+    best_delta = float('inf')
+
+    for bt_date_str, pain in btc_dict.items():
+        try:
+            bt_date = datetime.strptime(bt_date_str, "%Y-%m-%d").date()
+            delta = abs((bt_date - target).days)
+            if delta <= max_days and delta < best_delta:
+                best_delta = delta
+                best_pain = pain
+                best_date = bt_date_str
+        except ValueError:
+            continue
+
+    return best_pain, best_date
+
+
 def get_btc_expiry_pains():
     """Fetches BTC option OI from Deribit and calculates true Max Pain per expiry."""
     try:
         url = "https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option"
         resp = requests.get(url, timeout=15).json().get('result', [])
+        if not resp:
+            print("  ⚠️  Deribit returned empty result")
 
         # Group OI by expiry → strike → {call_oi, put_oi}
         expiry_data = {}
@@ -92,8 +124,10 @@ def get_btc_expiry_pains():
             if best_strike is not None:
                 results[dt] = best_strike
 
+        print(f"  ✓ Deribit: {len(results)} BTC expiries loaded ({min(results)} → {max(results)})" if results else "  ⚠️  No BTC expiries calculated")
         return results
-    except:
+    except Exception as e:
+        print(f"  ✗ Deribit fetch failed: {e}")
         return {}
 
 def update_expiry_history(chain_data):
@@ -144,6 +178,7 @@ def run_update():
         print(f"Failed to fetch spots, using defaults\n")
 
     btc_dict = get_btc_expiry_pains()
+    print(f"BTC dict has {len(btc_dict)} expiry entries\n")
     
     # Filter to expiries within next 180 days
     cutoff = (datetime.now(SGT) + timedelta(days=180)).strftime("%Y-%m-%d")
@@ -157,16 +192,23 @@ def run_update():
         print(f"[{i}/{len(all_options)}] {exp}...", end=" ")
         m_pain, m_call_oi, m_put_oi = calculate_max_pain(mstr, exp)
         
+        # FIX: Use nearest-date lookup (±14 days) instead of exact match.
+        # MSTR 3rd-Friday expiries often don't align with Deribit's last-Friday
+        # monthly expiries. A 14-day window bridges gaps like Jul-17 → Jul-31.
+        btc_pain_val, btc_matched_date = find_nearest_btc_pain(btc_dict, exp)
+        btc_label = f"(matched {btc_matched_date})" if btc_matched_date and btc_matched_date != exp else ""
+        
         if m_pain:
             chain_data.append({
                 "date": exp,
                 "mstr_pain": round(m_pain, 2),
-                "btc_pain": btc_dict.get(exp, None),
+                "btc_pain": btc_pain_val,
                 "call_oi": m_call_oi,
                 "put_oi": m_put_oi,
                 "is_monthly": (15 <= int(exp.split('-')[2]) <= 21)
             })
-            print(f"✓ Pain: ${m_pain:.0f}, OI: {m_call_oi + m_put_oi}")
+            btc_str = f"BTC: ${btc_pain_val:,.0f} {btc_label}" if btc_pain_val else "BTC: N/A"
+            print(f"✓ MSTR Pain: ${m_pain:.0f}, {btc_str}, OI: {m_call_oi + m_put_oi}")
         else:
             total_oi = m_call_oi + m_put_oi
             if total_oi > 0:
