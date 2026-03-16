@@ -36,8 +36,13 @@ jobs:
           git config --local user.email "actions@github.com"
           git config --local user.name "github-actions[bot]"
           git add .
-          git commit -m "Update Market Data [skip ci]" || echo "No changes to commit"
+          git diff --staged --quiet && echo "No changes to commit" && exit 0
+          git commit -m "Update Market Data [skip ci]"
           
-          git fetch origin main
-          git pull --rebase -X theirs origin main
-          git push origin main
+          # Retry push up to 3 times to handle concurrent run conflicts
+          for i in 1 2 3; do
+            git fetch origin main
+            git rebase -X theirs origin/main && git push origin main && break
+            echo "Push attempt $i failed, retrying..."
+            sleep 5
+          done
