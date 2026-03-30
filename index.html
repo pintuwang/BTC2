@@ -19,9 +19,10 @@
         .trend-chart-inner { width: 5000px; height: 500px; padding: 20px; }
         .accuracy-container { height: 500px; margin-top: 20px; background: #111; border-radius: 8px; padding: 20px; }
         .gap-container { height: 420px; margin-top: 20px; background: #111; border-radius: 8px; padding: 20px; }
-        .legend-pills { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px; font-size: 0.8em; }
+        .legend-pills { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 10px; font-size: 0.8em; color: #ccc; }
         .pill { display: flex; align-items: center; gap: 6px; }
-        .pill-dot { width: 12px; height: 12px; border-radius: 2px; }
+        .pill-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+        .pill-line { width: 20px; height: 3px; border-radius: 2px; flex-shrink: 0; }
     </style>
 </head>
 <body>
@@ -32,7 +33,7 @@
             <div id="last-update" style="font-size: 0.8em; color: #888; margin-left: auto;"></div>
         </div>
         <div id="scoreBox" class="score-box"><h1 id="scoreValue">--</h1><p id="scoreLabel">INITIALIZING...</p></div>
-        
+
         <div id="chart-wrapper"><canvas id="maxPainChart"></canvas></div>
 
         <div class="section-header">
@@ -52,15 +53,16 @@
         <div class="section-header">
             <h3>📊 Gap Analysis: Actual Close minus Max Pain + Put/Call Ratio</h3>
             <p style="font-size: 0.85em; color: #888;">
-                Bars show how far the actual close landed from max pain. Above zero = closed above pain.
-                Line shows Put/Call ratio at expiry (right-most orange axis).
+                Bars show how far the actual close landed from max pain at expiry. Above zero = closed above pain. Below zero = closed below pain.
+                Green line = Put/Call ratio at expiry (far-right axis).
             </p>
+            <!-- HTML legend — Chart.js legend is hidden to prevent floating dot artefacts -->
             <div class="legend-pills">
-                <div class="pill"><div class="pill-dot" style="background:rgba(0,255,136,0.8)"></div> MSTR closed above pain</div>
-                <div class="pill"><div class="pill-dot" style="background:rgba(255,68,68,0.8)"></div> MSTR closed below pain</div>
-                <div class="pill"><div class="pill-dot" style="background:rgba(52,152,219,0.8)"></div> BTC closed above pain</div>
-                <div class="pill"><div class="pill-dot" style="background:rgba(255,140,0,0.8)"></div> BTC closed below pain</div>
-                <div class="pill"><div class="pill-dot" style="background:#ffa500; border-radius:50%"></div> Put/Call ratio (orange axis →)</div>
+                <div class="pill"><div class="pill-swatch" style="background:rgba(255,255,153,0.9)"></div> MSTR closed above pain</div>
+                <div class="pill"><div class="pill-swatch" style="background:rgba(255,68,68,0.85)"></div> MSTR closed below pain</div>
+                <div class="pill"><div class="pill-swatch" style="background:rgba(21,101,192,0.85)"></div> BTC closed above pain</div>
+                <div class="pill"><div class="pill-swatch" style="background:rgba(144,202,249,0.85)"></div> BTC closed below pain</div>
+                <div class="pill"><div class="pill-line" style="background:#00ff88"></div> Put/Call ratio (right axis →)</div>
             </div>
             <div class="gap-container"><canvas id="gapChart"></canvas></div>
         </div>
@@ -68,9 +70,18 @@
 
 <script>
     let globalPayload, expiryHistory, historyLog, maxPainChart, trendChart, accuracyChart, gapChart;
-    const YELLOW = '#FFFF00';
+    const YELLOW     = '#FFFF00';
     const NEON_GREEN = 'rgba(57, 255, 20, 0.4)';
-    const NEON_PINK = 'rgba(255, 16, 240, 0.4)';
+    const NEON_PINK  = 'rgba(255, 16, 240, 0.4)';
+
+    // Chart 4 colour palette
+    const C4 = {
+        mstrAbove : 'rgba(255, 255, 153, 0.90)',   // light yellow  — MSTR closed above pain
+        mstrBelow : 'rgba(255,  68,  68, 0.85)',   // red           — MSTR closed below pain
+        btcAbove  : 'rgba( 21, 101, 192, 0.85)',   // dark blue     — BTC closed above pain
+        btcBelow  : 'rgba(144, 202, 249, 0.85)',   // light blue    — BTC closed below pain
+        pc        : '#00ff88'                       // neon green    — P/C ratio line & dots
+    };
 
     document.addEventListener('DOMContentLoaded', loadData);
 
@@ -79,25 +90,32 @@
             // Cache-busting: append timestamp so GitHub Pages always serves fresh JSON
             const cb = '?v=' + Date.now();
             const [c, h, l] = await Promise.all([
-                fetch('./data/history.json' + cb), fetch('./data/expiry_history.json' + cb), fetch('./data/history_log.json' + cb)
+                fetch('./data/history.json'        + cb),
+                fetch('./data/expiry_history.json' + cb),
+                fetch('./data/history_log.json'    + cb)
             ]);
-            globalPayload = await c.json();
-            expiryHistory = await h.json();
-            historyLog = await l.json();
-            
+            globalPayload  = await c.json();
+            expiryHistory  = await h.json();
+            historyLog     = await l.json();
+
             document.getElementById('last-update').innerText = `Last Sync: ${globalPayload.last_update}`;
-            renderMainChart(); renderTrendChart(); renderAccuracyChart(); renderGapChart(); updateAnalysis();
-        } catch (e) { console.error("Data Load Fail:", e); }
+            renderMainChart();
+            renderTrendChart();
+            renderAccuracyChart();
+            renderGapChart();
+            updateAnalysis();
+        } catch (e) { console.error('Data Load Fail:', e); }
     }
 
     function updateAnalysis() {
         if (!globalPayload) return;
         const strike = parseFloat(document.getElementById('strikeInput').value);
-        const score = globalPayload.spot > strike ? 10 : 4;
+        const score  = globalPayload.spot > strike ? 10 : 4;
         document.getElementById('scoreValue').innerText = `Safety Score: ${score}/10`;
-        document.getElementById('scoreBox').className = score >= 8 ? "score-box safe-bg" : "score-box danger-bg";
+        document.getElementById('scoreBox').className   = score >= 8 ? 'score-box safe-bg' : 'score-box danger-bg';
     }
 
+    // ── Chart 1: Max Pain overview ────────────────────────────────────────────
     function renderMainChart() {
         const ctx = document.getElementById('maxPainChart').getContext('2d');
         if (maxPainChart) maxPainChart.destroy();
@@ -106,23 +124,25 @@
                 labels: globalPayload.data.map(d => d.date),
                 datasets: [
                     { type: 'line', label: 'MSTR Pain', data: globalPayload.data.map(d => d.mstr_pain), borderColor: '#00ff88', borderWidth: 3, yAxisID: 'yP', tension: 0.3 },
-                    { type: 'line', label: 'BTC Pain', data: globalPayload.data.map(d => d.btc_pain), borderColor: '#3498db', yAxisID: 'yB', borderDash: [5,5], spanGaps: true },
-                    { type: 'bar', label: 'Calls', data: globalPayload.data.map(d => d.call_oi), backgroundColor: NEON_GREEN, yAxisID: 'yV', stack: 'v1' },
-                    { type: 'bar', label: 'Puts', data: globalPayload.data.map(d => d.put_oi), backgroundColor: NEON_PINK, yAxisID: 'yV', stack: 'v1' }
+                    { type: 'line', label: 'BTC Pain',  data: globalPayload.data.map(d => d.btc_pain),  borderColor: '#3498db', yAxisID: 'yB', borderDash: [5,5], spanGaps: true },
+                    { type: 'bar',  label: 'Calls',     data: globalPayload.data.map(d => d.call_oi),   backgroundColor: NEON_GREEN, yAxisID: 'yV', stack: 'v1' },
+                    { type: 'bar',  label: 'Puts',      data: globalPayload.data.map(d => d.put_oi),    backgroundColor: NEON_PINK,  yAxisID: 'yV', stack: 'v1' }
                 ]
             },
-            options: { 
-                responsive: true, maintainAspectRatio: false, 
-                scales: { 
-                    x: { ticks: { color: YELLOW } },
-                    yP: { position: 'left', beginAtZero: false, grace: '10%', ticks: { color: YELLOW } }, 
-                    yB: { position: 'right', grid: { display: false }, beginAtZero: false, grace: '10%', ticks: { color: YELLOW } }, 
-                    yV: { display: false, position: 'right', beginAtZero: true, max: 2000000, ticks: { color: YELLOW } } 
-                } 
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    x:  { ticks: { color: YELLOW } },
+                    yP: { position: 'left',  beginAtZero: false, grace: '10%', ticks: { color: YELLOW } },
+                    yB: { position: 'right', grid: { display: false }, beginAtZero: false, grace: '10%', ticks: { color: YELLOW } },
+                    // FIX: removed hardcoded max:2000000 — auto-scales so bars always visible
+                    yV: { display: false, position: 'right', beginAtZero: true, stacked: true, ticks: { color: YELLOW } }
+                }
             }
         });
     }
 
+    // ── Chart 2: Historical Evolution Tracker ────────────────────────────────
     function renderTrendChart() {
         const ctx = document.getElementById('trendChart').getContext('2d');
         if (trendChart) trendChart.destroy();
@@ -132,10 +152,10 @@
 
         Object.keys(expiryHistory).sort().forEach(exp => {
             const startIdx = currentIndex;
-            expiryHistory[exp].forEach((d) => {
+            expiryHistory[exp].forEach(d => {
                 nestedLabels.push([d.trade_date.slice(5), exp.slice(5)]);
                 mstr.push(d.mstr_pain); btc.push(d.btc_pain);
-                cV.push(d.call_oi); pV.push(d.put_oi);
+                cV.push(d.call_oi);    pV.push(d.put_oi);
                 currentIndex++;
             });
             boundaries.push({ boundary: currentIndex - 0.5, isFuture: exp >= todayStr, start: startIdx - 0.5, end: currentIndex - 0.5 });
@@ -145,30 +165,31 @@
         boundaries.forEach((b, i) => {
             annotations[`line${i}`] = { type: 'line', xMin: b.boundary, xMax: b.boundary, borderColor: YELLOW, borderWidth: 2 };
             if (b.isFuture) {
-                annotations[`box${i}`] = { type: 'box', xMin: b.start, xMax: b.end, backgroundColor: 'rgba(255, 255, 255, 1)', drawTime: 'beforeDatasetsDraw' };
+                annotations[`box${i}`] = { type: 'box', xMin: b.start, xMax: b.end, backgroundColor: 'rgba(255,255,255,1)', drawTime: 'beforeDatasetsDraw' };
             }
         });
 
         trendChart = new Chart(ctx, {
             data: { labels: nestedLabels, datasets: [
                 { type: 'line', label: 'MSTR Pain', data: mstr, borderColor: '#00ff88', yAxisID: 'yP', pointRadius: 2 },
-                { type: 'line', label: 'BTC Pain', data: btc, borderColor: '#3498db', yAxisID: 'yB', borderDash: [2,2], pointRadius: 0, spanGaps: true },
-                { type: 'bar', label: 'Calls', data: cV, backgroundColor: NEON_GREEN, yAxisID: 'yV', stack: 'h' },
-                { type: 'bar', label: 'Puts', data: pV, backgroundColor: NEON_PINK, yAxisID: 'yV', stack: 'h' }
+                { type: 'line', label: 'BTC Pain',  data: btc,  borderColor: '#3498db', yAxisID: 'yB', borderDash: [2,2], pointRadius: 0, spanGaps: true },
+                { type: 'bar',  label: 'Calls',     data: cV,   backgroundColor: NEON_GREEN, yAxisID: 'yV', stack: 'h' },
+                { type: 'bar',  label: 'Puts',      data: pV,   backgroundColor: NEON_PINK,  yAxisID: 'yV', stack: 'h' }
             ]},
-            options: { 
-                responsive: true, maintainAspectRatio: false, 
-                scales: { 
-                    x: { ticks: { font: { size: 9 }, color: YELLOW, autoSkip: false } }, 
-                    yP: { position: 'left', ticks: { color: YELLOW } }, 
-                    yB: { position: 'right', beginAtZero: false, grace: '10%', ticks: { color: YELLOW } }, 
-                    yV: { display: false, position: 'right', stacked: true, ticks: { color: YELLOW } } 
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    x:  { ticks: { font: { size: 9 }, color: YELLOW, autoSkip: false } },
+                    yP: { position: 'left',  ticks: { color: YELLOW } },
+                    yB: { position: 'right', beginAtZero: false, grace: '10%', ticks: { color: YELLOW } },
+                    yV: { display: false, position: 'right', stacked: true, ticks: { color: YELLOW } }
                 },
                 plugins: { annotation: { annotations: annotations } }
             }
         });
     }
 
+    // ── Chart 3: Expiry Accuracy ─────────────────────────────────────────────
     function renderAccuracyChart() {
         const ctx = document.getElementById('accuracyChart').getContext('2d');
         if (accuracyChart) accuracyChart.destroy();
@@ -177,40 +198,44 @@
         Object.keys(expiryHistory).sort().forEach(expDate => {
             const cluster = expiryHistory[expDate];
             if (!cluster || cluster.length === 0) return;
-            const finalPain = cluster[cluster.length - 1];
+            const finalPain  = cluster[cluster.length - 1];
             const nextDayStr = new Date(new Date(expDate).getTime() + 86400000).toISOString().split('T')[0];
-            const logEntry = historyLog.find(l => l.date === nextDayStr) || historyLog.find(l => l.date === expDate);
+            const logEntry   = historyLog.find(l => l.date === nextDayStr) || historyLog.find(l => l.date === expDate);
 
             if (logEntry && finalPain && expDate < new Date().toISOString().split('T')[0]) {
-                labs.push(expDate); spots.push(logEntry.spot);
+                labs.push(expDate);
+                spots.push(logEntry.spot);
                 btcSpots.push(logEntry.btc_spot || null);
-                pain.push(finalPain.mstr_pain); btcPain.push(finalPain.btc_pain);
-                cV.push(finalPain.call_oi); pV.push(finalPain.put_oi);
+                pain.push(finalPain.mstr_pain);
+                btcPain.push(finalPain.btc_pain);
+                cV.push(finalPain.call_oi);
+                pV.push(finalPain.put_oi);
             }
         });
 
         accuracyChart = new Chart(ctx, {
             data: { labels: labs, datasets: [
-                { type: 'line', label: 'MSTR Close', data: spots, borderColor: '#ffff00', backgroundColor: '#ffff00', showLine: false, pointStyle: 'star', pointRadius: 12, yAxisID: 'yP', order: 0 },
-                { type: 'line', label: 'BTC Close', data: btcSpots, borderColor: '#ffa500', backgroundColor: '#ffa500', showLine: false, pointStyle: 'circle', pointRadius: 8, yAxisID: 'yB', order: 0 },
-                { type: 'line', label: 'MSTR Pain', data: pain, borderColor: '#00ff88', borderWidth: 3, pointRadius: 5, yAxisID: 'yP', order: 1 },
-                { type: 'line', label: 'BTC Pain', data: btcPain, borderColor: '#3498db', borderDash: [5,5], yAxisID: 'yB', order: 1, spanGaps: true },
-                { type: 'bar', label: 'Total Calls', data: cV, backgroundColor: NEON_GREEN, yAxisID: 'yV', stack: 'oi', order: 2 },
-                { type: 'bar', label: 'Total Puts', data: pV, backgroundColor: NEON_PINK, yAxisID: 'yV', stack: 'oi', order: 2 }
+                { type: 'line', label: 'MSTR Close', data: spots,    borderColor: '#ffff00', backgroundColor: '#ffff00', showLine: false, pointStyle: 'star',   pointRadius: 12, yAxisID: 'yP', order: 0 },
+                { type: 'line', label: 'BTC Close',  data: btcSpots, borderColor: '#ffa500', backgroundColor: '#ffa500', showLine: false, pointStyle: 'circle', pointRadius: 8,  yAxisID: 'yB', order: 0 },
+                { type: 'line', label: 'MSTR Pain',  data: pain,     borderColor: '#00ff88', borderWidth: 3, pointRadius: 5, yAxisID: 'yP', order: 1 },
+                { type: 'line', label: 'BTC Pain',   data: btcPain,  borderColor: '#3498db', borderDash: [5,5], yAxisID: 'yB', order: 1, spanGaps: true },
+                { type: 'bar',  label: 'Total Calls',data: cV,       backgroundColor: NEON_GREEN, yAxisID: 'yV', stack: 'oi', order: 2 },
+                { type: 'bar',  label: 'Total Puts', data: pV,       backgroundColor: NEON_PINK,  yAxisID: 'yV', stack: 'oi', order: 2 }
             ]},
-            options: { 
-                responsive: true, maintainAspectRatio: false, 
-                scales: { 
-                    x: { ticks: { color: YELLOW } },
-                    yP: { position: 'left', title: { display: true, text: 'MSTR Price ($)', color: YELLOW }, beginAtZero: false, grace: '10%', ticks: { color: YELLOW } }, 
-                    yB: { position: 'right', title: { display: true, text: 'BTC Price ($)', color: YELLOW }, beginAtZero: false, grace: '10%', ticks: { color: YELLOW } }, 
-                    yV: { display: false, position: 'right', stacked: true, ticks: { color: YELLOW } } 
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    x:  { ticks: { color: YELLOW } },
+                    yP: { position: 'left',  title: { display: true, text: 'MSTR Price ($)', color: YELLOW }, beginAtZero: false, grace: '10%', ticks: { color: YELLOW } },
+                    yB: { position: 'right', title: { display: true, text: 'BTC Price ($)',  color: YELLOW }, beginAtZero: false, grace: '10%', ticks: { color: YELLOW } },
+                    yV: { display: false, position: 'right', stacked: true, ticks: { color: YELLOW } }
                 },
                 plugins: { legend: { labels: { color: YELLOW, usePointStyle: true } } }
             }
         });
     }
 
+    // ── Chart 4: Gap Analysis ────────────────────────────────────────────────
     function renderGapChart() {
         const ctx = document.getElementById('gapChart').getContext('2d');
         if (gapChart) gapChart.destroy();
@@ -221,13 +246,13 @@
         Object.keys(expiryHistory).sort().forEach(expDate => {
             const cluster = expiryHistory[expDate];
             if (!cluster || cluster.length === 0) return;
-            const finalPain = cluster[cluster.length - 1];
+            const finalPain  = cluster[cluster.length - 1];
             const nextDayStr = new Date(new Date(expDate).getTime() + 86400000).toISOString().split('T')[0];
-            const logEntry = historyLog.find(l => l.date === nextDayStr) || historyLog.find(l => l.date === expDate);
+            const logEntry   = historyLog.find(l => l.date === nextDayStr) || historyLog.find(l => l.date === expDate);
 
             if (logEntry && finalPain && expDate < new Date().toISOString().split('T')[0]) {
                 const mstrGap = parseFloat((logEntry.spot - finalPain.mstr_pain).toFixed(2));
-                const btcGap = (logEntry.btc_spot && finalPain.btc_pain)
+                const btcGap  = (logEntry.btc_spot && finalPain.btc_pain)
                     ? Math.round(logEntry.btc_spot - finalPain.btc_pain)
                     : null;
                 const pcRatio = finalPain.call_oi > 0
@@ -239,11 +264,13 @@
                 btcGaps.push(btcGap);
                 pcRatios.push(pcRatio);
 
-                // Green = closed above pain, Red = closed below pain
-                mstrColors.push(mstrGap >= 0 ? 'rgba(0,255,136,0.8)' : 'rgba(255,68,68,0.8)');
-                btcColors.push(btcGap === null
-                    ? 'transparent'
-                    : btcGap >= 0 ? 'rgba(52,152,219,0.8)' : 'rgba(255,140,0,0.8)'
+                // Light yellow = above pain, Red = below pain
+                mstrColors.push(mstrGap >= 0 ? C4.mstrAbove : C4.mstrBelow);
+                // Dark blue = above pain, Light blue = below pain; transparent if no data
+                btcColors.push(
+                    btcGap === null ? 'transparent'
+                    : btcGap >= 0   ? C4.btcAbove
+                    :                 C4.btcBelow
                 );
             }
         });
@@ -254,7 +281,7 @@
                 datasets: [
                     {
                         type: 'bar',
-                        label: 'MSTR Gap (Actual − Pain)',
+                        label: 'MSTR Gap',
                         data: mstrGaps,
                         backgroundColor: mstrColors,
                         borderColor: mstrColors,
@@ -265,7 +292,7 @@
                     },
                     {
                         type: 'bar',
-                        label: 'BTC Gap (Actual − Pain)',
+                        label: 'BTC Gap',
                         data: btcGaps,
                         backgroundColor: btcColors,
                         borderColor: btcColors,
@@ -278,11 +305,12 @@
                         type: 'line',
                         label: 'Put/Call Ratio',
                         data: pcRatios,
-                        borderColor: '#ffa500',
-                        backgroundColor: 'rgba(255,165,0,0.15)',
+                        borderColor: C4.pc,
+                        backgroundColor: 'rgba(0, 255, 136, 0.12)',
                         borderWidth: 2.5,
                         pointRadius: 5,
-                        pointBackgroundColor: '#ffa500',
+                        pointBackgroundColor: C4.pc,
+                        pointBorderColor: C4.pc,
                         fill: false,
                         yAxisID: 'yPC',
                         order: 1,
@@ -298,84 +326,67 @@
                 scales: {
                     x: {
                         ticks: { color: YELLOW },
-                        grid: { color: 'rgba(255,255,255,0.06)' }
+                        grid:  { color: 'rgba(255,255,255,0.06)' }
                     },
-                    // Left axis: MSTR gap in dollars
+                    // Left axis: MSTR gap ($), symmetric around 0
                     yP: {
                         type: 'linear',
                         position: 'left',
                         title: { display: true, text: 'MSTR Gap ($)', color: '#00ff88' },
                         ticks: { color: '#00ff88' },
-                        grid: { color: 'rgba(0,255,136,0.08)' },
-                        // Draw a zero baseline
+                        grid:  { color: 'rgba(0,255,136,0.08)' },
                         afterDataLimits(axis) {
-                            const mag = Math.max(Math.abs(axis.min), Math.abs(axis.max));
+                            const mag = Math.max(Math.abs(axis.min), Math.abs(axis.max), 1);
                             axis.min = -mag * 1.2;
-                            axis.max = mag * 1.2;
+                            axis.max =  mag * 1.2;
                         }
                     },
-                    // Right axis: BTC gap in dollars
+                    // Right axis: BTC gap ($), symmetric around 0
                     yB: {
                         type: 'linear',
                         position: 'right',
                         title: { display: true, text: 'BTC Gap ($)', color: '#3498db' },
                         ticks: { color: '#3498db' },
-                        grid: { drawOnChartArea: false },
+                        grid:  { drawOnChartArea: false },
                         afterDataLimits(axis) {
-                            const mag = Math.max(Math.abs(axis.min), Math.abs(axis.max));
+                            const mag = Math.max(Math.abs(axis.min), Math.abs(axis.max), 1);
                             axis.min = -mag * 1.2;
-                            axis.max = mag * 1.2;
+                            axis.max =  mag * 1.2;
                         }
                     },
-                    // Far-right axis: Put/Call ratio (Chart.js auto-offsets 2nd right axis)
+                    // Far-right axis: P/C ratio (Chart.js auto-offsets 2nd right axis)
                     yPC: {
                         type: 'linear',
                         position: 'right',
-                        title: { display: true, text: 'P/C Ratio', color: '#ffa500' },
-                        ticks: {
-                            color: '#ffa500',
-                            callback: v => v.toFixed(2)
-                        },
-                        grid: { drawOnChartArea: false },
+                        title: { display: true, text: 'P/C Ratio', color: C4.pc },
+                        ticks: { color: C4.pc, callback: v => v.toFixed(2) },
+                        grid:  { drawOnChartArea: false },
                         min: 0,
                         suggestedMax: 2
                     }
                 },
                 plugins: {
-                    legend: {
-                        labels: {
-                            color: YELLOW,
-                            usePointStyle: true,
-                            generateLabels(chart) {
-                                // Custom legend so colour boxes match bar logic
-                                return [
-                                    { text: 'MSTR Gap ▲ above pain', fillStyle: 'rgba(0,255,136,0.8)', strokeStyle: 'rgba(0,255,136,0.8)', lineWidth: 0 },
-                                    { text: 'MSTR Gap ▼ below pain', fillStyle: 'rgba(255,68,68,0.8)',  strokeStyle: 'rgba(255,68,68,0.8)',  lineWidth: 0 },
-                                    { text: 'BTC Gap ▲ above pain',  fillStyle: 'rgba(52,152,219,0.8)', strokeStyle: 'rgba(52,152,219,0.8)', lineWidth: 0 },
-                                    { text: 'BTC Gap ▼ below pain',  fillStyle: 'rgba(255,140,0,0.8)',  strokeStyle: 'rgba(255,140,0,0.8)',  lineWidth: 0 },
-                                    { text: 'Put/Call Ratio',        fillStyle: '#ffa500',               strokeStyle: '#ffa500',             lineWidth: 2, pointStyle: 'line' }
-                                ];
-                            }
-                        }
-                    },
+                    // FIX: hide Chart.js legend to prevent floating coloured dots —
+                    // the .legend-pills HTML above the chart handles the legend instead
+                    legend: { display: false },
                     tooltip: {
                         callbacks: {
                             label(ctx) {
                                 const v = ctx.parsed.y;
                                 if (v === null || v === undefined) return null;
-                                if (ctx.dataset.label.includes('MSTR'))
-                                    return `MSTR Gap: ${v >= 0 ? '+' : ''}$${v.toFixed(2)} (${v >= 0 ? '▲ above' : '▼ below'} pain)`;
-                                if (ctx.dataset.label.includes('BTC'))
-                                    return `BTC Gap: ${v >= 0 ? '+' : ''}$${v.toLocaleString()} (${v >= 0 ? '▲ above' : '▼ below'} pain)`;
-                                if (ctx.dataset.label.includes('Put'))
-                                    return `P/C Ratio: ${v.toFixed(3)} (${v > 1 ? 'Put-heavy' : 'Call-heavy'})`;
-                                return `${ctx.dataset.label}: ${v}`;
+                                if (ctx.dataset.label === 'MSTR Gap')
+                                    return `MSTR Gap: ${v >= 0 ? '+' : ''}$${v.toFixed(2)}  (${v >= 0 ? '▲ above' : '▼ below'} pain)`;
+                                if (ctx.dataset.label === 'BTC Gap')
+                                    return `BTC Gap: ${v >= 0 ? '+' : ''}$${v.toLocaleString()}  (${v >= 0 ? '▲ above' : '▼ below'} pain)`;
+                                if (ctx.dataset.label === 'Put/Call Ratio')
+                                    return `P/C Ratio: ${v.toFixed(3)}  (${v > 1 ? 'Put-heavy ↑' : 'Call-heavy ↓'})`;
+                                return null;
                             }
                         }
                     },
-                    // Draw a zero line across the chart area
                     annotation: {
                         annotations: {
+                            // White dashed zero line for gap bars
                             zeroline: {
                                 type: 'line',
                                 yMin: 0, yMax: 0,
@@ -384,14 +395,21 @@
                                 borderWidth: 1,
                                 borderDash: [6, 4]
                             },
+                            // Green dashed P/C = 1 reference line
                             pcOne: {
                                 type: 'line',
                                 yMin: 1, yMax: 1,
                                 yScaleID: 'yPC',
-                                borderColor: 'rgba(255,165,0,0.3)',
+                                borderColor: 'rgba(0,255,136,0.35)',
                                 borderWidth: 1,
                                 borderDash: [4, 4],
-                                label: { content: 'P/C = 1', display: true, position: 'end', color: '#ffa500', font: { size: 10 } }
+                                label: {
+                                    content: 'P/C = 1',
+                                    display: true,
+                                    position: 'end',
+                                    color: C4.pc,
+                                    font: { size: 10 }
+                                }
                             }
                         }
                     }
