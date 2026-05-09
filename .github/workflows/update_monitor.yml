@@ -13,10 +13,16 @@ concurrency:
 permissions:
   contents: write         # Allows saving JSON history
 
+# ── Node.js 24 compatibility ──────────────────────────────────────────────────
+# Opts in ahead of June 2 2026 forced cutover (Node 20 removed Sep 16 2026)
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 15   # Added to prevent cancellation during multiple data retries
+    timeout-minutes: 15   # Prevents cancellation during multiple data retries
+
     steps:
       - uses: actions/checkout@v4
 
@@ -38,7 +44,7 @@ jobs:
           git add .
           git diff --staged --quiet && echo "No changes to commit" && exit 0
           git commit -m "Update Market Data [skip ci]"
-          
+
           # Retry push up to 3 times to handle concurrent run conflicts
           for i in 1 2 3; do
             git fetch origin main
