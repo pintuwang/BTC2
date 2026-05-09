@@ -150,11 +150,12 @@ def update_expiry_history(chain_data):
                 "call_oi": entry['call_oi'],
                 "put_oi": entry['put_oi']
             })
-        # Keep last 10 entries
+        # Keep last 10 entries per expiry (evolution tracker snapshots — unchanged)
         history[exp] = history[exp][-10:]
 
-    # Clean up expired data older than 180 days
-    cutoff = (datetime.now(SGT) - timedelta(days=180)).strftime("%Y-%m-%d")
+    # ── EXTENDED: retain expiry history for 5 years (was 180 days) ──
+    # Enables 1, 2, 3, 4-year rolling analysis of max pain accuracy
+    cutoff = (datetime.now(SGT) - timedelta(days=1825)).strftime("%Y-%m-%d")
     history = {k: v for k, v in history.items() if k >= cutoff}
     
     with open(path, 'w') as f:
@@ -244,8 +245,12 @@ def run_update():
     else:
         log.append({"date": today, "spot": payload["spot"], "btc_spot": payload["btc_spot"]})
     
+    # ── EXTENDED: retain spot log for 5 years (was 60 days) ──
+    # Each entry = 1 calendar day. 1825 days = 5 years.
+    # Enables Charts 3 & 4 to show full multi-year expiry history
+    # and supports future 1/2/3/4-year rolling analysis windows.
     with open(log_path, 'w') as f:
-        json.dump(log[-60:], f, indent=4)
+        json.dump(log[-1825:], f, indent=4)
     
     print("\n" + "=" * 80)
     print(f"✓ Update Complete! {len(chain_data)} expiries in chart")
