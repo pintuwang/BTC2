@@ -1,12 +1,12 @@
 {
-    "last_update": "2026-05-22 00:19",
-    "spot": 165.45,
-    "btc_spot": 77111.23,
+    "last_update": "2026-05-22 06:57",
+    "spot": 164.85,
+    "btc_spot": 77549.59,
     "data": [
         {
             "date": "2026-05-22",
             "mstr_pain": 170.0,
-            "btc_pain": 79000.0,
+            "btc_pain": 78500.0,
             "call_oi": 253718,
             "put_oi": 129234,
             "is_monthly": false
@@ -54,7 +54,7 @@
         {
             "date": "2026-07-17",
             "mstr_pain": 165.0,
-            "btc_pain": 80000.0,
+            "btc_pain": 79000.0,
             "call_oi": 78195,
             "put_oi": 63548,
             "is_monthly": true
