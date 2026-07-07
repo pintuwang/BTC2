@@ -1,12 +1,12 @@
 {
-    "last_update": "2026-07-07 23:45",
-    "spot": 100.11,
-    "btc_spot": 63796.16,
+    "last_update": "2026-07-08 06:50",
+    "spot": 97.36,
+    "btc_spot": 63502.01,
     "data": [
         {
             "date": "2026-07-10",
             "mstr_pain": 96.0,
-            "btc_pain": 61000.0,
+            "btc_pain": 61500.0,
             "call_oi": 233104,
             "put_oi": 169287,
             "is_monthly": false
@@ -14,7 +14,7 @@
         {
             "date": "2026-07-17",
             "mstr_pain": 105.0,
-            "btc_pain": 61000.0,
+            "btc_pain": 62000.0,
             "call_oi": 200421,
             "put_oi": 191059,
             "is_monthly": true
@@ -23,8 +23,8 @@
             "date": "2026-07-24",
             "mstr_pain": 110.0,
             "btc_pain": 64000.0,
-            "call_oi": 20183,
-            "put_oi": 40066,
+            "call_oi": 20190,
+            "put_oi": 40096,
             "is_monthly": false
         },
         {
@@ -39,16 +39,16 @@
             "date": "2026-08-07",
             "mstr_pain": 100.0,
             "btc_pain": 64000.0,
-            "call_oi": 6513,
+            "call_oi": 6537,
             "put_oi": 8564,
             "is_monthly": false
         },
         {
             "date": "2026-08-14",
-            "mstr_pain": 102.0,
-            "btc_pain": 64000.0,
-            "call_oi": 637,
-            "put_oi": 702,
+            "mstr_pain": 103.0,
+            "btc_pain": 62000.0,
+            "call_oi": 2140,
+            "put_oi": 1649,
             "is_monthly": false
         },
         {
@@ -64,7 +64,7 @@
             "mstr_pain": 105.0,
             "btc_pain": 72000.0,
             "call_oi": 141148,
-            "put_oi": 137987,
+            "put_oi": 137973,
             "is_monthly": true
         },
         {
@@ -88,7 +88,7 @@
             "mstr_pain": 165.0,
             "btc_pain": 72000.0,
             "call_oi": 97676,
-            "put_oi": 111905,
+            "put_oi": 111888,
             "is_monthly": true
         }
     ]
