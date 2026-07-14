@@ -2703,6 +2703,13 @@
             "btc_pain": 62000.0,
             "call_oi": 328,
             "put_oi": 3825
+        },
+        {
+            "trade_date": "2026-07-14",
+            "mstr_pain": 100.0,
+            "btc_pain": 62000.0,
+            "call_oi": 959,
+            "put_oi": 3949
         }
     ]
 }
