@@ -1046,13 +1046,6 @@
     ],
     "2026-08-21": [
         {
-            "trade_date": "2026-07-27",
-            "mstr_pain": 110.0,
-            "btc_pain": 63000.0,
-            "call_oi": 187679,
-            "put_oi": 168001
-        },
-        {
             "trade_date": "2026-07-28",
             "mstr_pain": 110.0,
             "btc_pain": 63000.0,
@@ -1114,16 +1107,16 @@
             "btc_pain": 64000.0,
             "call_oi": 205385,
             "put_oi": 198543
+        },
+        {
+            "trade_date": "2026-08-07",
+            "mstr_pain": 95.0,
+            "btc_pain": 64000.0,
+            "call_oi": 208061,
+            "put_oi": 203457
         }
     ],
     "2026-09-18": [
-        {
-            "trade_date": "2026-07-27",
-            "mstr_pain": 100.0,
-            "btc_pain": 70000.0,
-            "call_oi": 180730,
-            "put_oi": 144661
-        },
         {
             "trade_date": "2026-07-28",
             "mstr_pain": 100.0,
@@ -1186,16 +1179,16 @@
             "btc_pain": 70000.0,
             "call_oi": 210532,
             "put_oi": 147894
+        },
+        {
+            "trade_date": "2026-08-07",
+            "mstr_pain": 100.0,
+            "btc_pain": 70000.0,
+            "call_oi": 214424,
+            "put_oi": 147934
         }
     ],
     "2026-12-18": [
-        {
-            "trade_date": "2026-07-27",
-            "mstr_pain": 165.0,
-            "btc_pain": 70000.0,
-            "call_oi": 101395,
-            "put_oi": 133740
-        },
         {
             "trade_date": "2026-07-28",
             "mstr_pain": 165.0,
@@ -1258,16 +1251,16 @@
             "btc_pain": 70000.0,
             "call_oi": 111055,
             "put_oi": 135414
+        },
+        {
+            "trade_date": "2026-08-07",
+            "mstr_pain": 165.0,
+            "btc_pain": 70000.0,
+            "call_oi": 111438,
+            "put_oi": 135742
         }
     ],
     "2027-01-15": [
-        {
-            "trade_date": "2026-07-27",
-            "mstr_pain": 150.0,
-            "btc_pain": null,
-            "call_oi": 212284,
-            "put_oi": 134016
-        },
         {
             "trade_date": "2026-07-28",
             "mstr_pain": 150.0,
@@ -1330,6 +1323,13 @@
             "btc_pain": null,
             "call_oi": 219822,
             "put_oi": 135867
+        },
+        {
+            "trade_date": "2026-08-07",
+            "mstr_pain": 150.0,
+            "btc_pain": null,
+            "call_oi": 220553,
+            "put_oi": 136077
         }
     ],
     "2027-06-17": [
@@ -1983,13 +1983,6 @@
     ],
     "2026-10-16": [
         {
-            "trade_date": "2026-07-27",
-            "mstr_pain": 155.0,
-            "btc_pain": null,
-            "call_oi": 29248,
-            "put_oi": 63042
-        },
-        {
             "trade_date": "2026-07-28",
             "mstr_pain": 155.0,
             "btc_pain": null,
@@ -2051,6 +2044,13 @@
             "btc_pain": 64000.0,
             "call_oi": 43591,
             "put_oi": 72266
+        },
+        {
+            "trade_date": "2026-08-07",
+            "mstr_pain": 130.0,
+            "btc_pain": 64000.0,
+            "call_oi": 44935,
+            "put_oi": 73232
         }
     ],
     "2026-06-05": [
@@ -2343,13 +2343,6 @@
     ],
     "2026-11-20": [
         {
-            "trade_date": "2026-07-27",
-            "mstr_pain": 165.0,
-            "btc_pain": null,
-            "call_oi": 15087,
-            "put_oi": 28680
-        },
-        {
             "trade_date": "2026-07-28",
             "mstr_pain": 165.0,
             "btc_pain": null,
@@ -2411,6 +2404,13 @@
             "btc_pain": null,
             "call_oi": 16684,
             "put_oi": 32357
+        },
+        {
+            "trade_date": "2026-08-07",
+            "mstr_pain": 165.0,
+            "btc_pain": null,
+            "call_oi": 18269,
+            "put_oi": 32798
         }
     ],
     "2026-07-10": [
@@ -2631,13 +2631,6 @@
     ],
     "2026-08-07": [
         {
-            "trade_date": "2026-07-27",
-            "mstr_pain": 100.0,
-            "btc_pain": 64000.0,
-            "call_oi": 20719,
-            "put_oi": 54453
-        },
-        {
             "trade_date": "2026-07-28",
             "mstr_pain": 100.0,
             "btc_pain": 64000.0,
@@ -2699,16 +2692,16 @@
             "btc_pain": 63500.0,
             "call_oi": 232913,
             "put_oi": 143677
+        },
+        {
+            "trade_date": "2026-08-07",
+            "mstr_pain": 93.0,
+            "btc_pain": 64000.0,
+            "call_oi": 248730,
+            "put_oi": 143302
         }
     ],
     "2026-08-14": [
-        {
-            "trade_date": "2026-07-27",
-            "mstr_pain": 105.0,
-            "btc_pain": 65000.0,
-            "call_oi": 8153,
-            "put_oi": 31985
-        },
         {
             "trade_date": "2026-07-28",
             "mstr_pain": 105.0,
@@ -2771,16 +2764,16 @@
             "btc_pain": 64000.0,
             "call_oi": 23250,
             "put_oi": 64590
+        },
+        {
+            "trade_date": "2026-08-07",
+            "mstr_pain": 100.0,
+            "btc_pain": 64000.0,
+            "call_oi": 27640,
+            "put_oi": 78228
         }
     ],
     "2026-08-28": [
-        {
-            "trade_date": "2026-07-27",
-            "mstr_pain": 105.0,
-            "btc_pain": 63000.0,
-            "call_oi": 7578,
-            "put_oi": 9320
-        },
         {
             "trade_date": "2026-07-28",
             "mstr_pain": 105.0,
@@ -2843,16 +2836,16 @@
             "btc_pain": 63000.0,
             "call_oi": 14462,
             "put_oi": 30568
+        },
+        {
+            "trade_date": "2026-08-07",
+            "mstr_pain": 100.0,
+            "btc_pain": 63000.0,
+            "call_oi": 14811,
+            "put_oi": 33428
         }
     ],
     "2026-09-04": [
-        {
-            "trade_date": "2026-07-27",
-            "mstr_pain": 101.0,
-            "btc_pain": 63000.0,
-            "call_oi": 639,
-            "put_oi": 524
-        },
         {
             "trade_date": "2026-07-28",
             "mstr_pain": 101.0,
@@ -2915,6 +2908,13 @@
             "btc_pain": 63000.0,
             "call_oi": 5300,
             "put_oi": 10669
+        },
+        {
+            "trade_date": "2026-08-07",
+            "mstr_pain": 110.0,
+            "btc_pain": 63000.0,
+            "call_oi": 7238,
+            "put_oi": 12552
         }
     ],
     "2026-09-11": [
@@ -2945,6 +2945,13 @@
             "btc_pain": 63000.0,
             "call_oi": 2209,
             "put_oi": 2278
+        },
+        {
+            "trade_date": "2026-08-07",
+            "mstr_pain": 100.0,
+            "btc_pain": 63000.0,
+            "call_oi": 2960,
+            "put_oi": 2823
         }
     ]
 }
