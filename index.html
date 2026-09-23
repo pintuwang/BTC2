@@ -202,7 +202,13 @@
         Object.keys(expiryHistory).sort().forEach(expDate => {
             const cluster = expiryHistory[expDate];
             if (!cluster || cluster.length === 0) return;
-            const finalPain  = cluster[cluster.length - 1];
+            // FIX: use last snapshot ON or BEFORE expiry day, not post-expiry.
+            // Post-expiry snapshots pick up the NEXT contract's BTC pain from
+            // Deribit's nearest-neighbor match, contaminating the comparison.
+            const onOrBefore = cluster.filter(r => r.trade_date <= expDate);
+            const finalPain  = onOrBefore.length > 0
+                ? onOrBefore[onOrBefore.length - 1]
+                : cluster[cluster.length - 1];   // fallback: use last if none match
             const nextDayStr = new Date(new Date(expDate).getTime() + 86400000).toISOString().split('T')[0];
             const logEntry   = historyLog.find(l => l.date === nextDayStr) || historyLog.find(l => l.date === expDate);
 
@@ -250,7 +256,11 @@
         Object.keys(expiryHistory).sort().forEach(expDate => {
             const cluster = expiryHistory[expDate];
             if (!cluster || cluster.length === 0) return;
-            const finalPain  = cluster[cluster.length - 1];
+            // FIX: use last snapshot ON or BEFORE expiry day (same fix as Chart 3)
+            const onOrBefore = cluster.filter(r => r.trade_date <= expDate);
+            const finalPain  = onOrBefore.length > 0
+                ? onOrBefore[onOrBefore.length - 1]
+                : cluster[cluster.length - 1];
             const nextDayStr = new Date(new Date(expDate).getTime() + 86400000).toISOString().split('T')[0];
             const logEntry   = historyLog.find(l => l.date === nextDayStr) || historyLog.find(l => l.date === expDate);
 
