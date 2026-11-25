@@ -1,61 +1,61 @@
 {
-    "last_update": "2026-11-25 06:57",
+    "last_update": "2026-11-25 12:40",
     "spot": 77.55,
-    "btc_spot": 59917.73,
+    "btc_spot": 59002.66,
     "data": [
         {
             "date": "2026-11-27",
             "mstr_pain": 86.0,
             "btc_pain": 72000.0,
             "call_oi": 269803,
-            "put_oi": 161491,
+            "put_oi": 161512,
             "is_monthly": false
         },
         {
             "date": "2026-12-04",
             "mstr_pain": 95.0,
             "btc_pain": 64000.0,
-            "call_oi": 43935,
-            "put_oi": 71691,
+            "call_oi": 43960,
+            "put_oi": 71697,
             "is_monthly": false
         },
         {
             "date": "2026-12-11",
-            "mstr_pain": 105.0,
+            "mstr_pain": 100.0,
             "btc_pain": 63000.0,
-            "call_oi": 11502,
-            "put_oi": 36251,
+            "call_oi": 11960,
+            "put_oi": 37043,
             "is_monthly": false
         },
         {
             "date": "2026-12-18",
             "mstr_pain": 120.0,
             "btc_pain": 70000.0,
-            "call_oi": 242247,
-            "put_oi": 171003,
+            "call_oi": 243372,
+            "put_oi": 172350,
             "is_monthly": true
         },
         {
             "date": "2026-12-24",
             "mstr_pain": 120.0,
             "btc_pain": 70000.0,
-            "call_oi": 7034,
+            "call_oi": 7050,
             "put_oi": 9855,
             "is_monthly": false
         },
         {
             "date": "2026-12-31",
-            "mstr_pain": 135.0,
+            "mstr_pain": 130.0,
             "btc_pain": 70000.0,
-            "call_oi": 5383,
-            "put_oi": 7110,
+            "call_oi": 5462,
+            "put_oi": 7188,
             "is_monthly": false
         },
         {
             "date": "2027-01-15",
             "mstr_pain": 115.0,
             "btc_pain": 67000.0,
-            "call_oi": 342659,
+            "call_oi": 342710,
             "put_oi": 163397,
             "is_monthly": true
         },
@@ -64,7 +64,7 @@
             "mstr_pain": 140.0,
             "btc_pain": 70000.0,
             "call_oi": 61143,
-            "put_oi": 67213,
+            "put_oi": 67211,
             "is_monthly": true
         },
         {
